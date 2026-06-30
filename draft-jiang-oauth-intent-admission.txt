@@ -1,0 +1,783 @@
+
+
+
+
+Web Authorization Protocol                                      Y. Jiang
+Internet-Draft                                                     L. Li
+Intended status: Standards Track                                 Y. Song
+Expires: 1 January 2027                                           F. Liu
+                                                                  Huawei
+                                                            30 June 2026
+
+
+            Intent Admission Assertions for Agentic Systems
+               draft-jiang-oauth-intent-admission-latest
+
+Abstract
+
+   In agentic systems, an intent expressed by a user, application, or
+   agent may be forwarded to a remote system that triggers high-impact
+   actions.  If the originator of an intent is not authenticated, is not
+   authorized to request the targeted action, or has not obtained the
+   required consent, the receiving system may act on a forged or
+   unauthorized intent.
+
+   This document defines the Intent Admission Assertion (IAA): a signed,
+   verifiable artifact by which an admission point authenticates an
+   intent originator, authorizes the request against a permission
+   policy, gates consent-required actions on explicit consent from the
+   user or resource owner, and conveys the result to a downstream
+   execution endpoint that re-verifies it before acting.  The IAA is a
+   JSON Web Token whose admission decision is expressed using Rich
+   Authorization Requests (RFC 9396).
+
+Status of This Memo
+
+   This Internet-Draft is submitted in full conformance with the
+   provisions of BCP 78 and BCP 79.
+
+   Internet-Drafts are working documents of the Internet Engineering
+   Task Force (IETF).  Note that other groups may also distribute
+   working documents as Internet-Drafts.  The list of current Internet-
+   Drafts is at https://datatracker.ietf.org/drafts/current/.
+
+   Internet-Drafts are draft documents valid for a maximum of six months
+   and may be updated, replaced, or obsoleted by other documents at any
+   time.  It is inappropriate to use Internet-Drafts as reference
+   material or to cite them other than as "work in progress."
+
+   This Internet-Draft will expire on 1 January 2027.
+
+Copyright Notice
+
+   Copyright (c) 2026 IETF Trust and the persons identified as the
+   document authors.  All rights reserved.
+
+   This document is subject to BCP 78 and the IETF Trust's Legal
+   Provisions Relating to IETF Documents (https://trustee.ietf.org/
+   license-info) in effect on the date of publication of this document.
+   Please review these documents carefully, as they describe your rights
+   and restrictions with respect to this document.  Code Components
+   extracted from this document must include Revised BSD License text as
+   described in Section 4.e of the Trust Legal Provisions and are
+   provided without warranty as described in the Revised BSD License.
+
+Table of Contents
+
+   1.  Introduction
+     1.1.  Conventions and Terminology
+   2.  Overview
+   3.  The Intent Admission Assertion
+     3.1.  Format
+     3.2.  Proof of Possession and Presentation Modes
+     3.3.  The "intent_admission" Authorization Detail
+     3.4.  Intent Binding
+     3.5.  Consent Evidence
+   4.  Issuing an Intent Admission Assertion
+     4.1.  Authenticating the Origin
+     4.2.  Authorizing the Request
+     4.3.  Obtaining Consent
+     4.4.  Constructing the IAA
+   5.  Verifying an Intent Admission Assertion
+   6.  Deployment Considerations
+     6.1.  Permission Policy
+     6.2.  Logging and Policy Update
+   7.  Security Considerations
+   8.  Privacy Considerations
+   9.  IANA Considerations
+   10. Normative References
+   11. Informative References
+   Appendix A.  Examples
+   Appendix B.  Relationship to the Intent Security Requirements
+   Acknowledgments
+   Authors' Addresses
+
+1.  Introduction
+
+   In agentic systems, intents are produced by users, applications, and
+   agents and forwarded to systems that may trigger high-impact actions,
+   such as purchases, data disclosure, or changes to account or device
+   state.  At the point where an intent enters such a system, the
+   receiver often cannot tell whether the intent truly came from the
+   claimed originator, whether that originator is permitted to request
+   the action, or whether the user or resource owner consented.  A co-
+   resident malicious application can fabricate an intent that appears
+   to come from the user; an originator running unattended in the
+   background can trigger a high-impact action without consent.
+
+   This document defines the Intent Admission Assertion (IAA), a signed
+   and verifiable artifact that an admission point produces after
+   authenticating the originator, evaluating a permission policy, and
+   (when the policy requires it) obtaining explicit consent from the
+   user or resource owner.  The IAA carries the admission decision to
+   the execution endpoint, which re-verifies it before performing the
+   requested action.  The design captures these signals at the earliest
+   point at which they are verifiable (the admission point) and enforces
+   them again at a non-bypassable point (the execution endpoint), so
+   that intermediaries that forward the intent need not be trusted.
+
+   The IAA reuses existing building blocks rather than introducing new
+   cryptography.  It is a JSON Web Token [RFC7519] following JWT best
+   current practices [RFC8725]; the admission decision is expressed as a
+   Rich Authorization Requests authorization detail [RFC9396]; proof of
+   possession [RFC7800] binds the IAA to an authorized presenter; and
+   the JSON Canonicalization Scheme [RFC8785] provides a stable
+   representation for binding to a JSON intent.  An IAA MAY be conveyed
+   as, or alongside, a transaction token
+   [I-D.ietf-oauth-transaction-tokens] or its agent profile
+   [I-D.araut-oauth-transaction-tokens-for-agents]; related profiles
+   include the agent-to-agent OAuth profile [I-D.liu-oauth-a2a-profile]
+   and agentic JWT [I-D.goswami-agentic-jwt].
+
+   A fuller threat model and the security requirements that motivate
+   this profile are described in [I-D.jiang-intent-security] and
+   [I-D.ni-a2a-ai-agent-security-requirements]; Appendix B maps the
+   behavior defined here onto those requirements.
+
+1.1.  Conventions and Terminology
+
+   The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+   "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY", and
+   "OPTIONAL" in this document are to be interpreted as described in BCP
+   14 [RFC2119] [RFC8174] when, and only when, they appear in all
+   capitals, as shown here.
+
+   The terms Intent, Intent Originator, and Admission Control are used
+   as in [I-D.jiang-intent-security].  This document additionally uses:
+
+   Intent:  A declarative request, produced by an Intent Originator, for
+      a targeted action or service.
+
+   Intent Originator:  The entity that produces an intent, e.g., an
+      application, an operating system component, or an agent.
+
+   Intent Admission Assertion (IAA):  The verifiable artifact defined by
+      this document, issued by an Admission Point upon admitting an
+      intent.
+
+   Admission Point (AP):  The entity that authenticates the originator,
+      evaluates the permission policy, obtains consent where required,
+      and issues an IAA.  It MAY act as, or interact with, an OAuth
+      authorization server or assertion issuer.
+
+   Execution Endpoint (EE):  The entity that re-verifies an IAA and
+      performs, or refuses, the requested action; it acts as an OAuth
+      [RFC6749] resource server.
+
+   Permission Policy:  Policy determining which originators may request
+      which actions, and which actions require consent.
+
+   Policy Authority:  The entity that maintains the Permission Policy.
+
+2.  Overview
+
+   Three roles participate in admitting and acting on an intent.  The
+   Intent Originator produces the intent and holds an identity
+   credential.  The Admission Point sits where the intent enters the
+   system: it authenticates the originator, decides whether the request
+   is permitted, obtains consent when the policy requires it, and, on a
+   positive decision, issues an IAA.  The Execution Endpoint performs
+   the action; before doing so it verifies the IAA.  A Policy Authority
+   maintains the policy the Admission Point and Execution Endpoint
+   apply.
+
+   Originator identity is established by an identity credential.  For
+   workload originators, such as cloud agents or services, deployments
+   can use WIMSE workload credentials [I-D.ietf-wimse-workload-creds],
+   with the identifiers and terminology of [I-D.ietf-wimse-arch] and
+   [I-D.ietf-wimse-identifier].  Local originators, such as on-device
+   applications or operating system components, can instead use a
+   platform identity, application attestation, or a device-bound key;
+   not every originator is a WIMSE workload.  Request-level proof of
+   possession can reuse WIMSE request protection
+   [I-D.ietf-wimse-http-signature].
+
+    +------------+   intent +        +-----------------------+
+    |  Intent    |   credential      |    Admission Point    |
+    | Originator |------------------>| - authenticate origin |
+    | (app / OS  |                   | - authorize request   |
+    |  / agent)  |                   | - obtain consent      |
+    +------------+                   |   (when required)      |
+                                     +-----------+-----------+
+                                                 |
+                                     Intent Admission Assertion
+                                     (signed JWT)
+                                                 v
+                                        [ relay / network ]
+                                                 |
+                                                 v
+                                     +-----------------------+
+                                     |   Execution Endpoint  |
+                                     | - verify the IAA      |
+                                     | - act, or refuse      |
+                                     +-----------------------+
+
+                      Figure 1: Intent admission flow
+
+   The intent and the IAA may pass through relays, gateways, or other
+   intermediaries that are not trusted to preserve them.  The IAA is
+   therefore self-protecting: it is signed, bound to the intent, and
+   bound to an authorized presenter, so that an intermediary can forward
+   it but cannot forge or repurpose it, and the Execution Endpoint can
+   verify it independently of any transport-layer protection.
+
+3.  The Intent Admission Assertion
+
+3.1.  Format
+
+   An IAA is a JWT [RFC7519] protected as a JWS, and MUST follow
+   [RFC8725].  It contains the following registered claims:
+
+   iss:  Identifier of the Admission Point that issued the IAA.
+
+   aud:  The intended Execution Endpoint(s).  An Execution Endpoint MUST
+      reject an IAA whose "aud" does not include it.
+
+   iat, exp:  Issuance and expiry.  The validity period SHOULD be short.
+
+   jti:  A unique identifier used for replay detection.
+
+   cnf:  A confirmation claim [RFC7800] identifying the key of the
+      authorized presenter (Section 3.2).  When the "jkt" (JWK SHA-256
+      Thumbprint) confirmation method is used, it follows [RFC9449].
+
+   The admission decision is carried as an authorization detail
+   (Section 3.3).  A CBOR Web Token / COSE encoding may be defined by a
+   future profile and is out of scope for this document.
+
+3.2.  Proof of Possession and Presentation Modes
+
+   Because an IAA may traverse relays and gateways, the party that
+   presents it to the Execution Endpoint is not necessarily the
+   Originator.  The "cnf" claim therefore binds the IAA to the key of
+   the authorized presenter, according to the presentation mode:
+
+   Direct presentation:
+      The Originator presents the IAA directly to the Execution
+      Endpoint, the "presenter" member (Section 3.3) has "mode" of
+      "direct", and "cnf" binds the Originator's key.
+
+   Delegated presentation:
+      An authorized presenter (for example, the Admission Point, a
+      gateway, an agent runtime, or a relay) presents the IAA on the
+      Originator's behalf.  The "presenter" member identifies that
+      presenter with "mode" of "delegated", "cnf" binds the authorized
+      presenter's key, and the IAA retains the authenticated Originator
+      identity in the "originator" member.
+
+   The Execution Endpoint MUST verify the "cnf" proof against the key of
+   the actual presenting party, and MUST verify that the presenting
+   party is the authorized presenter identified by the "presenter"
+   member.
+
+3.3.  The "intent_admission" Authorization Detail
+
+   The admission decision is a single Rich Authorization Requests
+   [RFC9396] authorization detail object with "type" set to
+   "intent_admission", carried in the "authorization_details" claim of
+   the IAA.  The value "intent_admission" MAY be used where the type
+   namespace is local to the issuer; deployments requiring cross-issuer
+   interoperability SHOULD use a collision-resistant type value, such as
+   a URI under their administrative control.  Following [RFC9396], the
+   common data fields "actions", "locations", and "datatypes" appear at
+   the top level of the object.  The object has the following members:
+
+   intent_ref (REQUIRED):  A binding to the admitted intent
+      (Section 3.4): a JSON object with members "hash_alg", "digest"
+      (base64url), and "canonicalization".
+
+   originator (REQUIRED):  A JSON object describing the authenticated
+      originator, with members "id" (the originator identity, e.g., a
+      WIMSE identifier), "class" (e.g., "application", "os_component",
+      or "agent"), "execution_context" (where available, one of
+      "foreground", "unattended", "delegated_background", or
+      "scheduled"), and OPTIONAL "attestation" (a reference to attested
+      application/workload state).  Raw behavioral history is not
+      included (Section 8).
+
+   presenter (REQUIRED):  A JSON object identifying the party authorized
+      to present the IAA: "id" (the presenter identity), "mode"
+      ("direct" or "delegated"), and OPTIONAL "cnf_ref" (the
+      confirmation method in "cnf" bound to this presenter, e.g.,
+      "jkt").  In "direct" mode, "id" equals the originator's "id".
+
+   actions, locations, datatypes:  The admitted action(s), resource
+      location(s), and data type(s), using the common data fields of
+      [RFC9396].
+
+   decision (REQUIRED):  The admission outcome.  This profile defines
+      only the value "admit"; rejected or escalated intents do not yield
+      an IAA.  The member is retained for audit clarity.
+
+   consent_required (REQUIRED):  A boolean indicating whether the
+      Permission Policy requires explicit consent for this request
+      (Section 4.3).
+
+   consent (REQUIRED when "consent_required" is true):  Evidence of
+      consent (Section 3.5).
+
+   constraints (OPTIONAL):  A constraint envelope carried for downstream
+      constraint or semantic checks.
+
+3.4.  Intent Binding
+
+   The IAA is bound to the specific intent it admits, so that it cannot
+   be replayed against a different intent.  The "intent_ref" member
+   carries a digest of the admitted intent together with the parameters
+   needed to reproduce it.
+
+   If the admitted intent is a JSON object, the digest input MUST be the
+   JSON Canonicalization Scheme [RFC8785] representation of that object,
+   and "canonicalization" MUST be "jcs".  If the admitted intent is not
+   JSON, the digest input MUST be the exact octet sequence received by
+   the Admission Point, and "canonicalization" MUST be "none".  The hash
+   algorithm identifier is carried in "hash_alg"; implementations MUST
+   support "sha-256" and MUST NOT use MD5 or SHA-1.
+
+3.5.  Consent Evidence
+
+   When "consent_required" is true, the "consent" object MUST be
+   present; its presence indicates that consent was obtained, since an
+   IAA is not issued when required consent is refused or absent.  The
+   object provides evidence of consent and does not define user-
+   interface behavior.  Its members are:
+
+   method (REQUIRED):  How consent was obtained, e.g.,
+      "user_confirmation", "prior_grant", or "step_up".
+
+   time (REQUIRED):  The time consent was obtained.
+
+   scope_ref (REQUIRED):  A reference binding the consent to this
+      admitted intent and scope.  The value MUST be derived from, or
+      otherwise uniquely reference, the admitted intent, the admitted
+      action/resource scope, and any constraints that were presented for
+      consent.
+
+   evidence_ref (OPTIONAL):  A reference to evidence retained locally or
+      by the Admission Point.  It MUST NOT expose raw user-interface
+      content, behavioral history, or a full user profile.
+
+4.  Issuing an Intent Admission Assertion
+
+   An Admission Point admits an intent, and issues an IAA, only after
+   the following steps succeed.
+
+4.1.  Authenticating the Origin
+
+   The Admission Point MUST authenticate the Originator and verify the
+   binding between the intent and the Originator identity.  The
+   originator authentication mechanism MUST cover, or be bound to, the
+   submitted intent or an unambiguous digest of it, so that an
+   originator credential cannot be paired with a different intent; the
+   specific mechanism (e.g., an HTTP Message Signature, a DPoP-like
+   proof, an attestation-bound request, or a local OS-mediated call) is
+   not specified here.  An intent whose origin cannot be verified MUST
+   NOT be admitted.
+
+4.2.  Authorizing the Request
+
+   The Admission Point evaluates the authenticated Originator against
+   the Permission Policy, using risk-relevant originator attributes such
+   as identifier, class, execution context, attested state, or locally
+   maintained risk signals.  The Admission Point MUST NOT admit the
+   intent if the requested action is not permitted for that originator
+   by the policy, if the originator is not permitted by the policy, or
+   if the originator's execution context is one the policy disallows
+   (for example, unattended background execution).
+
+4.3.  Obtaining Consent
+
+   This document does not define a global taxonomy of high-impact
+   actions.  Whether an action requires consent is determined by the
+   Permission Policy, which may mark a service, action, data type,
+   amount, target resource, or execution context as requiring explicit
+   consent from the user or resource owner.  When the policy so
+   requires, the Admission Point sets "consent_required" to true, MUST
+   obtain and verify explicit consent, and MUST include the
+   corresponding "consent" evidence in the IAA.  If consent is absent or
+   refused, the intent MUST NOT be admitted.
+
+4.4.  Constructing the IAA
+
+   On admission, the Admission Point constructs the IAA per Section 3,
+   binds it to the intent (Section 3.4) and to an authorized presenter
+   key (Section 3.2), signs it, and returns it for forwarding.
+
+5.  Verifying an Intent Admission Assertion
+
+   Before performing a requested action, the Execution Endpoint MUST:
+
+   1.  verify the JWS signature and that "iss" is a trusted Admission
+       Point;
+
+   2.  verify "aud" includes this Execution Endpoint and that the IAA is
+       within its validity period;
+
+   3.  verify the "cnf" proof of possession against the actual
+       presenting party's key, and verify that the presenting party is
+       the authorized presenter identified by "presenter" (Section 3.2);
+
+   4.  detect replay using "jti";
+
+   5.  verify "intent_ref" matches the intent being acted upon
+       (Section 3.4);
+
+   6.  verify that the requested action and all action parameters are
+       within the admitted action/resource scope (the "actions",
+       "locations", and "datatypes") and any applicable "constraints";
+       if a constraint carried in the IAA cannot be interpreted or
+       enforced, the Execution Endpoint MUST refuse the action unless
+       local policy explicitly permits ignoring that constraint;
+
+   7.  when "consent_required" is true, verify that valid "consent"
+       evidence is present.
+
+   These checks are the authoritative gate: the Execution Endpoint
+   enforces them so that no side path can bypass them.  If any check
+   fails, the Execution Endpoint MUST refuse the action and SHOULD
+   record audit evidence.
+
+   For defense in depth, an Execution Endpoint may independently
+   evaluate the Originator and the requested action against its own copy
+   of the Permission Policy, applying the conditions of Section 4.2 and
+   Section 4.3, rather than relying solely on the Admission Point's
+   decision.  Where the policy indicates that additional originator
+   information is required, or the action is of a predetermined
+   sensitive type, the Execution Endpoint SHOULD request an updated or
+   re-issued IAA carrying the required minimized attributes, rather than
+   relying on ad hoc attributes obtained outside the assertion.
+
+6.  Deployment Considerations
+
+6.1.  Permission Policy
+
+   This document does not define a policy language.  A conforming
+   deployment is able to determine, for a given authenticated
+   originator, requested action, execution context, and consent
+   requirement, whether an IAA may be issued.  Binding to a specific
+   policy language or engine is out of scope.
+
+6.2.  Logging and Policy Update
+
+   Admission Points and Execution Endpoints may emit log records
+   associated with an originator and/or an action, supporting
+   auditability and policy-driven response.  Such records carry the same
+   privacy obligations as IAAs (Section 8): raw behavioral history is
+   not exported, and reported attributes are minimized.  The transport,
+   cadence, aggregation, and policy-update mechanism for such records
+   are deployment-specific and out of scope.
+
+7.  Security Considerations
+
+   The IAA is a sensitive artifact.  Proof of possession ("cnf") is
+   REQUIRED to prevent a stolen IAA from being presented by an
+   unauthorized party; the proof binds to the authorized presenter per
+   the presentation mode (Section 3.2).  Short validity, "jti"-based
+   replay detection, and audience restriction further limit misuse.
+   Because the IAA may traverse untrusted intermediaries, its integrity
+   and binding do not rely on transport security.
+
+   Admission Point compromise: a compromised Admission Point can issue
+   IAAs for arbitrary originators.  Admission Point signing keys MUST be
+   protected, rotated, and revocable, and Execution Endpoints SHOULD
+   constrain the set of trusted issuers and the originators an issuer
+   may assert.
+
+   Intent binding: without "intent_ref", an IAA could be replayed
+   against a different intent.  The canonicalization and hash
+   requirements of Section 3.4 prevent rebinding; algorithm agility
+   allows migration away from weakened hashes.
+
+   Algorithm downgrade: Execution Endpoints MUST reject IAAs that use
+   disallowed signature or hash algorithms, and MUST NOT accept
+   "alg":"none".
+
+   Attestation freshness: where "attestation" is used, Execution
+   Endpoints SHOULD verify its freshness, as stale attestation can mask
+   a changed originator state.
+
+   Replay detection SHOULD be scoped at least by ("iss", "jti") and
+   retained until the IAA expires.  If an IAA has multiple audiences,
+   replay-detection state is maintained consistently across the relevant
+   audiences, or the IAA is audience-restricted to a single Execution
+   Endpoint.
+
+   Confidentiality: a JWS-protected IAA provides integrity but not
+   confidentiality.  If an IAA contains deployment-sensitive or privacy-
+   sensitive attributes, deployments SHOULD use encryption (e.g., a
+   JWE), an opaque reference, or an end-to-end protected channel between
+   the Admission Point and the Execution Endpoint.
+
+8.  Privacy Considerations
+
+   An IAA SHOULD avoid exposing raw local state or behavioral history to
+   downstream entities.  Originator attributes are minimized to those
+   relevant to the admission decision, and coarse-grained decisions or
+   policy references are preferred over detailed originator profiles.
+   Consent evidence references (Section 3.5) MUST NOT expose raw user-
+   interface content, behavioral history, or a full user profile.
+
+9.  IANA Considerations
+
+   This document does not request any IANA actions.  The
+   "authorization_details" JWT claim is already registered by [RFC9396].
+   This document defines a new authorization details type value,
+   "intent_admission", for use by deployments supporting this profile.
+   As [RFC9396] does not establish a central registry for authorization
+   details type values, "intent_admission" is a deployment-local value;
+   deployments requiring cross-issuer interoperability use a collision-
+   resistant value as described in Section 3.3.
+
+10.  Normative References
+
+   [RFC2119]  Bradner, S., "Key words for use in RFCs to Indicate
+              Requirement Levels", BCP 14, RFC 2119,
+              DOI 10.17487/RFC2119, March 1997,
+              <https://www.rfc-editor.org/info/rfc2119>.
+
+   [RFC7519]  Jones, M., Bradley, J., and N. Sakimura, "JSON Web Token
+              (JWT)", RFC 7519, DOI 10.17487/RFC7519, May 2015,
+              <https://www.rfc-editor.org/info/rfc7519>.
+
+   [RFC7800]  Jones, M., Bradley, J., and H. Tschofenig, "Proof-of-
+              Possession Key Semantics for JSON Web Tokens (JWTs)",
+              RFC 7800, DOI 10.17487/RFC7800, April 2016,
+              <https://www.rfc-editor.org/info/rfc7800>.
+
+   [RFC8174]  Leiba, B., "Ambiguity of Uppercase vs Lowercase in RFC
+              2119 Key Words", BCP 14, RFC 8174, DOI 10.17487/RFC8174,
+              May 2017, <https://www.rfc-editor.org/info/rfc8174>.
+
+   [RFC8725]  Sheffer, Y., Hardt, D., and M. Jones, "JSON Web Token Best
+              Current Practices", BCP 225, RFC 8725,
+              DOI 10.17487/RFC8725, February 2020,
+              <https://www.rfc-editor.org/info/rfc8725>.
+
+   [RFC8785]  Rundgren, A., Jordan, B., and S. Erdtman, "JSON
+              Canonicalization Scheme (JCS)", RFC 8785,
+              DOI 10.17487/RFC8785, June 2020,
+              <https://www.rfc-editor.org/info/rfc8785>.
+
+   [RFC9396]  Lodderstedt, T., Richer, J., and B. Campbell, "OAuth 2.0
+              Rich Authorization Requests", RFC 9396,
+              DOI 10.17487/RFC9396, May 2023,
+              <https://www.rfc-editor.org/info/rfc9396>.
+
+   [RFC9449]  Fett, D., Campbell, B., Bradley, J., Lodderstedt, T.,
+              Jones, M., and D. Waite, "OAuth 2.0 Demonstrating Proof of
+              Possession (DPoP)", RFC 9449, DOI 10.17487/RFC9449,
+              September 2023, <https://www.rfc-editor.org/info/rfc9449>.
+
+11.  Informative References
+
+   [I-D.araut-oauth-transaction-tokens-for-agents]
+              Raut, A., "Transaction Tokens For Agents", Work in
+              Progress, Internet-Draft, draft-araut-oauth-transaction-
+              tokens-for-agents-02, 21 May 2026,
+              <https://datatracker.ietf.org/doc/html/draft-araut-oauth-
+              transaction-tokens-for-agents-02>.
+
+   [I-D.goswami-agentic-jwt]
+              Goswami, A., "Secure Intent Protocol: JWT Compatible
+              Agentic Identity and Workflow Management", Work in
+              Progress, Internet-Draft, draft-goswami-agentic-jwt-00, 1
+              January 2026, <https://datatracker.ietf.org/doc/html/
+              draft-goswami-agentic-jwt-00>.
+
+   [I-D.ietf-oauth-transaction-tokens]
+              Tulshibagwale, A., Fletcher, G., and P. Kasselman,
+              "Transaction Tokens", Work in Progress, Internet-Draft,
+              draft-ietf-oauth-transaction-tokens-08, 2 March 2026,
+              <https://datatracker.ietf.org/doc/html/draft-ietf-oauth-
+              transaction-tokens-08>.
+
+   [I-D.ietf-wimse-arch]
+              Salowey, J. A., Rosomakho, Y., and H. Tschofenig,
+              "Workload Identity in a Multi System Environment (WIMSE)
+              Architecture", Work in Progress, Internet-Draft, draft-
+              ietf-wimse-arch-07, 2 March 2026,
+              <https://datatracker.ietf.org/doc/html/draft-ietf-wimse-
+              arch-07>.
+
+   [I-D.ietf-wimse-http-signature]
+              Salowey, J. A. and Y. Sheffer, "WIMSE Workload-to-Workload
+              Authentication with HTTP Signatures", Work in Progress,
+              Internet-Draft, draft-ietf-wimse-http-signature-03, 7
+              April 2026, <https://datatracker.ietf.org/doc/html/draft-
+              ietf-wimse-http-signature-03>.
+
+   [I-D.ietf-wimse-identifier]
+              Rosomakho, Y. and J. A. Salowey, "Workload Identifier",
+              Work in Progress, Internet-Draft, draft-ietf-wimse-
+              identifier-02, 2 March 2026,
+              <https://datatracker.ietf.org/doc/html/draft-ietf-wimse-
+              identifier-02>.
+
+   [I-D.ietf-wimse-workload-creds]
+              Campbell, B., Salowey, J. A., Schwenkschuster, A.,
+              Sheffer, Y., and Y. Rosomakho, "WIMSE Workload
+              Credentials", Work in Progress, Internet-Draft, draft-
+              ietf-wimse-workload-creds-01, 5 May 2026,
+              <https://datatracker.ietf.org/doc/html/draft-ietf-wimse-
+              workload-creds-01>.
+
+   [I-D.jiang-intent-security]
+              Jiang, Y., Lun, L., Song, Y., and F. Liu, "Security
+              Considerations and Requirements for Intent-Based Requests
+              in Agentic Systems", Work in Progress, Internet-Draft,
+              draft-jiang-intent-security-03, 22 June 2026,
+              <https://datatracker.ietf.org/doc/html/draft-jiang-intent-
+              security-03>.
+
+   [I-D.liu-oauth-a2a-profile]
+              Liu, P. C. and N. Yuan, "Agent-to-Agent (A2A) Profile for
+              OAuth Transaction Tokens", Work in Progress, Internet-
+              Draft, draft-liu-oauth-a2a-profile-00, 20 October 2025,
+              <https://datatracker.ietf.org/doc/html/draft-liu-oauth-
+              a2a-profile-00>.
+
+   [I-D.ni-a2a-ai-agent-security-requirements]
+              Yuan, N., Liu, P. C., Gao, Q., and Z. Li, "Security
+              Requirements for AI Agents", Work in Progress, Internet-
+              Draft, draft-ni-a2a-ai-agent-security-requirements-01, 28
+              February 2026, <https://datatracker.ietf.org/doc/html/
+              draft-ni-a2a-ai-agent-security-requirements-01>.
+
+   [RFC6749]  Hardt, D., Ed., "The OAuth 2.0 Authorization Framework",
+              RFC 6749, DOI 10.17487/RFC6749, October 2012,
+              <https://www.rfc-editor.org/info/rfc6749>.
+
+Appendix A.  Examples
+
+   This appendix is informative.  Whitespace is added for readability;
+   long values are abbreviated with an ellipsis.
+
+   {
+     "type": "intent_admission",
+     "intent_ref": {
+       "hash_alg": "sha-256",
+       "digest": "0Fb9q2...e2c4",
+       "canonicalization": "jcs"
+     },
+     "originator": {
+       "id": "spiffe://example.org/agent/scheduler",
+       "class": "agent",
+       "execution_context": "foreground",
+       "attestation": "https://as.example.org/att/abc123"
+     },
+     "presenter": {
+       "id": "spiffe://example.org/gateway/order-gw",
+       "mode": "delegated",
+       "cnf_ref": "jkt"
+     },
+     "actions": ["purchase"],
+     "locations": ["https://api.example.com/orders"],
+     "datatypes": ["order"],
+     "decision": "admit",
+     "consent_required": true,
+     "consent": {
+       "method": "user_confirmation",
+       "time": "2026-06-23T08:59:00Z",
+       "scope_ref": "b3JkZXJz...",
+       "evidence_ref": "urn:example:consent:abc123"
+     },
+     "constraints": { "max_amount": "100.00", "currency": "USD" }
+   }
+
+            Figure 2: An "intent_admission" authorization detail
+
+   The IAA is a JWS-signed JWT.  Its decoded payload carries the
+   registered claims and the authorization detail above:
+
+   {
+     "iss": "https://ap.example.org",
+     "aud": "https://api.example.com",
+     "iat": 1782205200,
+     "exp": 1782205320,
+     "jti": "9b8c7d6e-5f4a-3b2c-1d0e-0a1b2c3d4e5f",
+     "cnf": { "jkt": "0ZcOCMrU9eL3...K2bSt8Uw" },
+     "authorization_details": [
+       {
+         "type": "intent_admission",
+         "intent_ref": {
+           "hash_alg": "sha-256",
+           "digest": "0Fb9q2...e2c4",
+           "canonicalization": "jcs"
+         },
+         "originator": {
+           "id": "spiffe://example.org/agent/scheduler",
+           "class": "agent",
+           "execution_context": "foreground"
+         },
+         "presenter": {
+           "id": "spiffe://example.org/gateway/order-gw",
+           "mode": "delegated",
+           "cnf_ref": "jkt"
+         },
+         "actions": ["purchase"],
+         "decision": "admit",
+         "consent_required": true,
+         "consent": {
+           "method": "user_confirmation",
+           "time": "2026-06-23T08:59:00Z",
+           "scope_ref": "b3JkZXJz..."
+         }
+       }
+     ]
+   }
+
+         Figure 3: Decoded payload of an Intent Admission Assertion
+
+   The JWS header (not shown) carries the signing algorithm and a
+   reference to the Admission Point's key; the compact serialization
+   concatenates the header, payload, and signature.
+
+Appendix B.  Relationship to the Intent Security Requirements
+
+   This appendix is informative.  It maps the behavior defined in this
+   document onto the security requirements of
+   [I-D.jiang-intent-security], for readers familiar with that document.
+
+   +=======================================+==========================+
+   | Behavior in this document             | Requirement              |
+   +=======================================+==========================+
+   | Authenticating the origin             | R8 (Origin               |
+   | (Section 4.1)                         | Authentication)          |
+   +---------------------------------------+--------------------------+
+   | Authorizing the request and obtaining | R9 (Originator           |
+   | consent (Section 4.2, Section 4.3)    | Authorization and        |
+   |                                       | Consent-Gated Admission) |
+   +---------------------------------------+--------------------------+
+   | Verifying the IAA as a non-bypassable | R5 (Non-Bypass           |
+   | gate (Section 5)                      | Enforcement)             |
+   +---------------------------------------+--------------------------+
+   | Logging and policy update             | R6, R7 (Observability;   |
+   | (Section 6.2)                         | Policy-Driven Response)  |
+   +---------------------------------------+--------------------------+
+
+       Table 1: Mapping to [I-D.jiang-intent-security] requirements
+
+Acknowledgments
+
+   TODO
+
+Authors' Addresses
+
+   Yuning Jiang
+   Huawei
+   Email: jiangyuning2@h-partners.com
+
+
+   Lun Li
+   Huawei
+   Email: lilun20@huawei.com
+
+
+   Yurong Song
+   Huawei
+   Email: songyurong1@huawei.com
+
+
+   Faye Liu
+   Huawei
+   Email: liufei19@huawei.com

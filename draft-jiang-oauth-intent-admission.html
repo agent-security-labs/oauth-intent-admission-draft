@@ -1,0 +1,2093 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta content="Common,Latin" name="scripts">
+<meta content="initial-scale=1.0" name="viewport">
+<title>Intent Admission Assertions for Agentic Systems</title>
+<meta content="Yuning Jiang" name="author">
+<meta content="Lun Li" name="author">
+<meta content="Yurong Song" name="author">
+<meta content="Faye Liu" name="author">
+<meta content="
+       
+        In agentic systems, an intent expressed by a user, application, or agent may be forwarded to a
+        remote system that triggers high-impact actions. If the originator of an intent is not
+        authenticated, is not authorized to request the targeted action, or has not obtained the required
+        consent, the receiving system may act on a forged or unauthorized intent.
+       
+       
+        This document defines the Intent Admission Assertion (IAA): a signed, verifiable artifact by which
+        an admission point authenticates an intent originator, authorizes the request against a permission
+        policy, gates consent-required actions on explicit consent from the user or resource owner, and
+        conveys the result to a downstream execution endpoint that re-verifies it before acting. The IAA is
+        a JSON Web Token whose admission decision is expressed using Rich Authorization Requests (RFC 9396).
+       
+    " name="description">
+<meta content="xml2rfc 3.34.0" name="generator">
+<meta content="OAuth" name="keyword">
+<meta content="intent" name="keyword">
+<meta content="AI agents" name="keyword">
+<meta content="admission control" name="keyword">
+<meta content="consent" name="keyword">
+<meta content="workload identity" name="keyword">
+<meta content="draft-jiang-oauth-intent-admission-latest" name="ietf.draft">
+<!-- Generator version information:
+  xml2rfc 3.34.0
+    Python 3.14.5
+    ConfigArgParse 1.7.5
+    google-i18n-address 3.1.1
+    intervaltree 3.2.1
+    Jinja2 3.1.6
+    lxml 6.1.1
+    natsort 8.4.0
+    platformdirs 4.10.0
+    pycountry 24.6.1
+    PyYAML 6.0.3
+    requests 2.33.1
+    wcwidth 0.8.1
+-->
+<link href="draft-jiang-oauth-intent-admission.xml" rel="alternate" type="application/rfc+xml">
+<link href="#copyright" rel="license">
+<style type="text/css">@font-face {
+  font-family: 'Lora';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Lora Italic'), local('Lora-Italic'), url('https://martinthomson.github.io/rfc-css/fonts/lora-italic-cyrillic-ext.woff2') format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C88, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Lora Italic'), local('Lora-Italic'), url('https://martinthomson.github.io/rfc-css/fonts/lora-italic-cyrillic-ext.woff2') format('woff2');
+  unicode-range: U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Lora Italic'), local('Lora-Italic'), url('https://martinthomson.github.io/rfc-css/fonts/lora-italic-vietnamese.woff2') format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+1EA0-1EF9, U+20AB;
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Lora Italic'), local('Lora-Italic'), url('https://martinthomson.github.io/rfc-css/fonts/lora-italic-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-024F, U+0259, U+1E00-1EFF, U+2020, U+20A0-20AB, U+20AD-20CF, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: 'Lora';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Lora Italic'), local('Lora-Italic'), url('https://martinthomson.github.io/rfc-css/fonts/lora-italic-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Lora Regular'), local('Lora-Regular'), url('https://martinthomson.github.io/rfc-css/fonts/lora-regular-cyrillic-ext.woff2') format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C88, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Lora Regular'), local('Lora-Regular'), url('https://martinthomson.github.io/rfc-css/fonts/lora-regular-cyrillic.woff2') format('woff2');
+  unicode-range: U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Lora Regular'), local('Lora-Regular'), url('https://martinthomson.github.io/rfc-css/fonts/lora-regular-vietnamese.woff2') format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+1EA0-1EF9, U+20AB;
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Lora Regular'), local('Lora-Regular'), url('https://martinthomson.github.io/rfc-css/fonts/lora-regular-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-024F, U+0259, U+1E00-1EFF, U+2020, U+20A0-20AB, U+20AD-20CF, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Lora Regular'), local('Lora-Regular'), url('https://martinthomson.github.io/rfc-css/fonts/lora-regular-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Lora';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: local('Lora Bold'), local('Lora-Bold'), url('https://martinthomson.github.io/rfc-css/fonts/lora-bold-cyrillic-ext.woff2') format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C88, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: local('Lora Bold'), local('Lora-Bold'), url('https://martinthomson.github.io/rfc-css/fonts/lora-bold-cyrillic.woff2') format('woff2');
+  unicode-range: U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: local('Lora Bold'), local('Lora-Bold'), url('https://martinthomson.github.io/rfc-css/fonts/lora-bold-vietnamese.woff2') format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+1EA0-1EF9, U+20AB;
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: local('Lora Bold'), local('Lora-Bold'), url('https://martinthomson.github.io/rfc-css/fonts/lora-bold-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-024F, U+0259, U+1E00-1EFF, U+2020, U+20A0-20AB, U+20AD-20CF, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: local('Lora Bold'), local('Lora-Bold'), url('https://martinthomson.github.io/rfc-css/fonts/lora-bold-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: local('Lora SemiBold'), local('Lora-SemiBold'), url('https://martinthomson.github.io/rfc-css/fonts/lora-semibold-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Oxygen Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Oxygen Mono'), local('OxygenMono-Regular'), url('https://martinthomson.github.io/rfc-css/fonts/oxygenmono-regular-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Oxygen Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Oxygen Mono'), local('OxygenMono-Regular'), url('https://martinthomson.github.io/rfc-css/fonts/oxygenmono-regular-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+}
+
+@font-face {
+  font-family: 'Sofia Sans Semi Condensed';
+  font-style: italic;
+  font-weight: 1 1000;
+  src: url('https://martinthomson.github.io/rfc-css/fonts/sofiasanssemicondensed-italic-cyrillic-ext.woff2') format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+@font-face {
+  font-family: 'Sofia Sans Semi Condensed';
+  font-style: italic;
+  font-weight: 1 1000;
+  src: url('https://martinthomson.github.io/rfc-css/fonts/sofiasanssemicondensed-italic-cyrillic.woff2') format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+@font-face {
+  font-family: 'Sofia Sans Semi Condensed';
+  font-style: italic;
+  font-weight: 1 1000;
+  src: url('https://martinthomson.github.io/rfc-css/fonts/sofiasanssemicondensed-italic-greek.woff2') format('woff2');
+  unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF;
+}
+@font-face {
+  font-family: 'Sofia Sans Semi Condensed';
+  font-style: italic;
+  font-weight: 1 1000;
+  src: url('https://martinthomson.github.io/rfc-css/fonts/sofiasanssemicondensed-italic-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Sofia Sans Semi Condensed';
+  font-style: italic;
+  font-weight: 1 1000;
+  src: url('https://martinthomson.github.io/rfc-css/fonts/sofiasanssemicondensed-italic-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Sofia Sans Semi Condensed';
+  font-style: normal;
+  font-weight: 1 1000;
+  src: url('https://martinthomson.github.io/rfc-css/fonts/sofiasanssemicondensed-regular-cyrillic-ext.woff2') format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+@font-face {
+  font-family: 'Sofia Sans Semi Condensed';
+  font-style: normal;
+  font-weight: 1 1000;
+  src: url('https://martinthomson.github.io/rfc-css/fonts/sofiasanssemicondensed-regular-cyrillic.woff2') format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+@font-face {
+  font-family: 'Sofia Sans Semi Condensed';
+  font-style: normal;
+  font-weight: 1 1000;
+  src: url('https://martinthomson.github.io/rfc-css/fonts/sofiasanssemicondensed-regular-greek.woff2') format('woff2');
+  unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF;
+}
+@font-face {
+  font-family: 'Sofia Sans Semi Condensed';
+  font-style: normal;
+  font-weight: 1 1000;
+  src: url('https://martinthomson.github.io/rfc-css/fonts/sofiasanssemicondensed-regular-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Sofia Sans Semi Condensed';
+  font-style: normal;
+  font-weight: 1 1000;
+  src: url('https://martinthomson.github.io/rfc-css/fonts/sofiasanssemicondensed-regular-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+:root {
+  color-scheme: light dark;
+  --background-color: #fff;
+  --text-color: #222;
+  --title-color: #191919;
+  --link-color: #2a6496;
+  --highlight-color: #f9f9f9;
+  --line-color: #eee;
+  --pilcrow-weak: #ddd;
+  --pilcrow-strong: #bbb;
+  --small-font-size: 14.5px;
+  --font-mono: 'Oxygen Mono', monospace;
+  --font-title: "Sofia Sans Semi Condensed", sans-serif;
+  scrollbar-color: #bbb #eee;
+}
+body {
+  max-width: 600px;
+  margin: 75px auto;
+  padding: 0 5px;
+  color: var(--text-color);
+  background-color: var(--background-color);
+  font: 16px/22px "Lora", serif;
+  scroll-behavior: smooth;
+}
+
+.ears {
+  display: none;
+}
+
+/* headings */
+section {
+  clear: both;
+}
+.section-number {
+  padding-right: 0.5em;
+}
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-title);
+  font-weight: 680;
+  margin: 0.8em 0 0.3em;
+  font-size-adjust: 0.5;
+  color: var(--title-color);
+}
+h1 {
+  &#title {
+    font-size: 32px;
+    line-height: 40px;
+    clear: both;
+    margin: 1.5em 0 0.2em;
+  }
+  &#rfcnum {
+    margin: 1.5em 0 0.2em;
+    & + h1#title {
+      margin: 0.2em 0;
+    }
+  }
+}
+
+h1, h2, h3 {
+  font-size: 22px;
+  line-height: 27px;
+}
+h4, h5, h6 {
+  font-size: 20px;
+  line-height: 24px;
+}
+
+/* general structure */
+.author {
+  padding-bottom: 0.3em;
+  vertical-align: top;
+}
+#abstract+p {
+  font-size: 18px;
+  line-height: 24px;
+  & code, & samp, & tt {
+    font-size: 16px;
+    line-height: 0;
+  }
+}
+
+p {
+  padding: 0;
+  margin: 0.5em 0;
+  text-align: left;
+}
+div {
+  margin: 0;
+}
+.alignRight {
+  margin: 1em 0;
+  &.art-text {
+    background-color: var(--highlight-color);
+    border: 1px solid var(--line-color);
+    border-radius: 3px;
+    padding: 0.5em 1em 0;
+    margin-bottom: 0.5em;
+    & pre {
+      padding: 0;
+      width: auto;
+    }
+  }
+  & > *:first-child {
+    border: none;
+    margin: 0;
+    float: right;
+    clear: both;
+  }
+  & > *:nth-child(2) {
+    clear: both;
+    display: block;
+    border: none;
+  }
+}
+svg {
+  display: block;
+  /* font-family isn't space-separated, but =~ will have to do */
+  &[font-family~="monospace" i], & [font-family~="monospace" i] {
+    font-family: var(--font-mono);
+  }
+}
+.alignCenter {
+  margin: 1em 0;
+  &.art-text {
+    background-color: var(--highlight-color);
+    border: 1px solid var(--line-color);
+    border-radius: 3px;
+    padding: 0.5em 1em 0;
+    margin-bottom: 0.5em;
+    & pre {
+      padding: 0;
+      width: auto;
+    }
+  }
+  & > *:first-child {
+    border: none;
+    /* this isn't optimal, but it's an existence proof.  PrinceXML doesn't
+       support flexbox yet.
+    */
+    display: table;
+    margin: 0 auto;
+  }
+}
+
+/* lists */
+ol, ul {
+  padding: 0;
+  margin: 0 0 0.5em 2em;
+  & :is(ol, ul) {
+    margin-left: 1em;
+  }
+}
+li {
+  margin: 0 0 0.25em 0;
+}
+ul.empty, .ulEmpty {
+  list-style-type: none;
+  & li {
+    margin-top: 0.5em;
+  }
+}
+:is(ul, ol).compact, .ulCompact, .olCompact {
+  margin: 0 0 0 2em;
+  & li {
+    margin: 0;
+    & :first-child { margin-top: 0; }
+    & :last-child { margin-bottom: 0; }
+  }
+}
+
+/* definition lists */
+dl {
+  clear: left;
+  --indent: 3ch;
+  /* --indent: attr(indent ch); not supported in any browser, but we can dream */
+  &.olPercent {
+    --indent: 5ch;
+    & > dt {
+      min-width: calc(var(--indent) - 2ch);
+      float: none;
+    }
+  }
+
+  dl > dd > & {
+    margin-top: 0.5em;
+    margin-bottom: 0;
+  }
+
+  &:not(.dlNewline) > dt {
+    float: left;
+    margin-right: 2ch;
+    min-width: 8ch;
+  }
+  & > dd {
+    margin-bottom: .8em;
+    margin-left: var(--indent) !important; /* stupid element overrides */
+    min-height: 2ex;
+  }
+}
+:is(dl.compact, .dlCompact) > dd {
+  margin-bottom: 0;
+  & > :is(:first-child, .break:first-child + *) {
+    margin-top: 0;
+  }
+  & > :is(:last-child) {
+    margin-bottom: 0;
+  }
+}
+:is(dd, span).break {
+  display: none;
+}
+
+/* links */
+a {
+  text-decoration: none;
+  &[href] {
+    color: var(--link-color);
+    &:hover { text-decoration: underline; }
+    &.selfRef {
+      color: var(--text-color);
+      &:hover {
+        text-decoration: none;
+        background-color: var(--highlight-color);
+      }
+    }
+  }
+}
+.iref + a[href].internal {
+  color: var(--text-color);
+}
+a.xref:is(.cite, .auto), :is(#status-of-memo, #copyright) a {
+  white-space: nowrap;
+}
+
+/* Figures */
+tt, code, pre {
+  background-color: var(--highlight-color);
+  font: 14px/22px var(--font-mono);
+}
+tt, code {
+  /* changing the font for inline elements leads to different ascender
+     and descender heights; as we want to retain baseline alignment,
+     remove leading to avoid altering the final height of lines
+     note: this fails if these blocks take an entire line,
+     a different solution would be great */
+  line-height: 0;
+}
+:is(h1, h2, h3, h4, h5, h6) :is(tt, code) {
+  font-size: 84%;
+}
+pre {
+  border: 1px solid var(--line-color);
+  font-size: 13.5px;
+  line-height: 16px;
+  letter-spacing: -0.2px;
+  margin: 5px;
+  padding: 5px;
+}
+img {
+  max-width: 100%;
+}
+figure {
+  margin: 0.5em 0;
+  padding: 0;
+  & blockquote {
+    margin: 0.8em 0.4em 0.4em;
+  }
+}
+figcaption, caption {
+  font-style: italic;
+  margin: 0.5em 1.5em;
+  text-align: left;
+  caption-side: bottom;
+}
+@media screen {
+  /* Auto-collapse boilerplate. */
+  :is(#status-of-memo, #copyright) {
+    & p {
+      margin: -2px 0;
+      max-height: 0;
+      transition: max-height 2s ease, margin 0.5s ease 0.5s;
+      overflow: hidden;
+    }
+    &:hover p,
+    & h2:target ~ p {
+      margin: 0.5em 0;
+      max-height: 500px;
+      overflow: auto;
+    }
+  }
+  pre, svg {
+    display: inline-block;
+    /* In the horizontal direction, sometimes people make over-sized figures.
+       Scrollbars for those is therefore necessary: auto adds them as necessary..
+       In the vertical direction, the line-height can combine with the font
+       asender/descender height to produce scrollbars: hidden avoids that. */
+    overflow: auto hidden;
+  }
+  pre {
+    max-width: 100%;
+    width: calc(100% - 22px - 1em);
+  }
+  svg {
+    max-width: calc(100% - 22px - 1em);
+  }
+  figure pre {
+    display: block;
+    width: calc(100% - 25px);
+  }
+  :is(pre, svg) + .pilcrow {
+    display: inline-block;
+    vertical-align: text-bottom;
+    padding-bottom: 8px;
+  }
+}
+
+/* aside, blockquote */
+aside, blockquote {
+  margin-left: 0;
+  padding: 0 2em;
+  font-style: italic;
+}
+blockquote {
+  margin: 1em 0;
+  border-left: 2px var(--pilcrow-strong) solid;
+}
+cite {
+  display: block;
+  text-align: right;
+  font-style: italic;
+}
+
+/* tables */
+table {
+  width: auto;
+  max-width: 100%;
+  margin: 0 0 1em;
+  border-collapse: collapse;
+  &.right { margin-left: auto; }
+  &.center { margin-left: auto; margin-right: auto; }
+  &.left { margin-right: auto; }
+  & .text-left { text-align: left; }
+  & .text-center { text-align: center; }
+  & .text-right { text-align: right; }
+  & caption {
+    margin: 0;
+    padding: 3px 0 3px 1em;
+  }
+  & p { margin: 0; }
+}
+
+thead, tbody {
+  border: 1px solid var(--line-color);
+}
+th, td {
+  text-align: left;
+  vertical-align: top;
+  padding: 5px 10px;
+}
+th {
+  background-color: var(--line-color);
+}
+:is(tr:nth-child(2n), thead+tbody > tr:nth-child(2n+1)) > td {
+  background-color: var(--background-color);
+}
+:is(tr:nth-child(2n+1), thead+tbody > tr:nth-child(2n)) > td {
+  background-color: var(--highlight-color);
+}
+
+/* pilcrow */
+a.pilcrow {
+  margin-left: 3px;
+  opacity: 0.2;
+  user-select: none;
+  &[href] {
+    color: var(--pilcrow-weak);
+    &:hover { text-decoration: none; }
+  }
+  @media not print {
+    :hover > &, &:focus {
+      opacity: 1;
+    }
+    &[href]:hover {
+      color: var(--pilcrow-strong);
+      background-color: transparent;
+    }
+  }
+  @media print {
+    display: none;
+  }
+}
+
+/* misc */
+hr {
+  border: 0;
+  border-top: 1px solid var(--line-color);
+}
+.bcp14 {
+  font-variant: small-caps;
+  font-weight: 600;
+  font-size: var(--small-font-size);
+}
+.role {
+  font-variant: all-small-caps;
+}
+sub, sup {
+  line-height: 1;
+  font-size: 80%;
+}
+
+/* info block */
+#identifiers {
+  margin: 0;
+  font-size: var(--small-font-size);
+  line-height: 18px;
+  --identifier-width: 15ch;
+  & dt {
+    width: var(--identifier-width);
+    min-width: var(--identifier-width);
+    clear: left;
+    float: left;
+    text-align: right;
+    margin-right: 1ch;
+  }
+  & dd {
+    margin: 0;
+    margin-left: calc(1em + var(--identifier-width)) !important;
+    min-width: 5em;
+  }
+  & .authors {
+    & .author {
+      display: inline-block;
+      margin-right: 1.5em;
+    }
+    & .org {
+      font-style: italic;
+    }
+  }
+}
+
+/* The prepared/rendered info at the very bottom of the page */
+.docInfo {
+  color: #999;
+  font-size: 0.9em;
+  font-style: italic;
+  margin-top: 2em;
+  & .prepared {
+    float: right;
+  }
+}
+
+/* table of contents */
+#toc {
+  padding: 0.75em 0 2em 0;
+  margin-bottom: 1em;
+
+  & nav {
+    & ul {
+      margin: 0 0.5em 0 0;
+      padding: 0;
+      list-style: none;
+    }
+    & li {
+      line-height: 1.3em;
+      margin: 2px 0;
+      padding-left: 1.2em;
+      text-indent: -1.2em;
+    }
+  }
+  & a.xref {
+    white-space: normal;
+  }
+}
+
+.references {
+  & > dt {
+    text-align: right;
+    font-weight: bold;
+    min-width: 10ch;
+    margin-right: 1.5ch;
+    &:target::before {
+      content: "⇒";
+      margin: 0 10px 0 -25px;
+    }
+  }
+  & > dd {
+    margin-left: 12ch !important;
+    overflow: visible;
+    & .refInstance {
+      margin-bottom: 0.8em;
+    }
+    & .ascii {
+      margin-bottom: 0.25em;
+    }
+  }
+}
+
+#rfc\.index\.index + ul {
+  margin-left: 0;
+}
+
+/* authors */
+address.vcard {
+  font-style: normal;
+  max-width: 20em;
+  margin: 1em auto 1em 0;
+
+  & .nameRole {
+    font-weight: 700;
+    margin-left: 0;
+  }
+  & .label {
+    margin: 0.5em 0;
+  }
+  & .type {
+    display: none;
+  }
+  & .alternative-contact {
+    margin: 0.5em 0 0.25em 0;
+  }
+  & .non-ascii {
+    margin: 0 0 0 2em;
+  }
+  & div.left {
+    text-align: left;
+  }
+  & div.right {
+    text-align: right;
+  }
+}
+
+hr.addr {
+  border-top: 1px dashed;
+  margin: 0;
+  color: #ddd;
+  max-width: calc(100% - 16px);
+}
+@media (min-width: 500px) {
+  #authors-addresses {
+    & > section {
+      column-count: 2;
+      column-gap: 20px;
+    }
+    & > section > h2 {
+      column-span: all;
+    }
+    /* hack for break-inside: avoid-column */
+    & address {
+      display: inline-block;
+      break-inside: avoid-column;
+    }
+  }
+}
+
+/* Comments */
+.rfcEditorRemove {
+  & p:first-of-type {
+    font-style: italic;
+  }
+}
+.cref {
+  background-color: rgba(249, 232, 105, 0.3);
+  padding: 2px 4px;
+}
+.crefSource {
+  font-style: italic;
+}
+
+@media screen {
+  #toc {
+    & nav {
+      font-family: var(--font-title);
+      font-weight: 360;
+      & > ul { margin-bottom: 2em; }
+      & ul {
+        margin: 0 0 0 4px;
+        & :is(p, li) {
+          margin: 2px 0;
+        }
+      }
+    }
+    & a.toplink {
+      float: right;
+    }
+  }
+}
+@media not screen {
+  #toc a.toplink {
+    display: none;
+  }
+}
+
+
+/* TOC layout for smaller screens */
+@media screen and (max-width: 929px) {
+  #toc {
+    position: fixed;
+    z-index: 2;
+    top: 0;
+    right: 0;
+    padding: 1px 0 0 0;
+    margin: 0;
+    border-bottom: 1px solid #ccc;
+    opacity: 0.6;
+    & h2 {
+      margin: 0;
+      padding: 2px 0 2px 6px;
+      padding-right: 1em;
+      font-size: 18px;
+      line-height: 24px;
+      min-width: 190px;
+      text-align: right;
+      background-color: #444;
+      color: white;
+      cursor: pointer;
+      &::before { /* css hamburger */
+        float: right;
+        position: relative;
+        width: 1em;
+        height: 1px;
+        left: -164px;
+        margin: 8px 0 0 0;
+        background: white none repeat scroll 0 0;
+        box-shadow: 0 4px 0 0 white, 0 8px 0 0 white;
+        content: "";
+      }
+    }
+    & nav {
+      display: none;
+      background-color: var(--background-color);
+      padding: 0.5em 1em 1em;
+      overflow: auto;
+      overscroll-behavior: contain;
+      height: calc(100vh - 48px);
+      border-left: 1px solid #ddd;
+    }
+    &.active {
+      opacity: 1;
+      & nav { display: block; }
+    }
+    /* Make the collapsed ToC header render white on gray also when it's a link */
+    & h2 a,
+    & h2 a:is(:link, :focus, :hover),
+    & a.toplink,
+    & a.toplink:hover {
+      color: white;
+      background-color: #444;
+      text-decoration: none;
+    }
+    & a.toplink {
+      margin: 2px 0.5em 0;
+    }
+  }
+}
+
+/* TOC layout for wide screens */
+@media screen and (min-width: 930px) {
+  body {
+    padding-right: 360px;
+    padding-right: calc(min(180px + 20%, 500px));
+  }
+  #toc {
+    position: fixed;
+    bottom: 0;
+    right: 0;
+    right: calc(50vw - 480px);
+    width: 312px;
+    margin: 0;
+    padding: 0;
+    z-index: 1;
+    & h2 {
+      margin: 0;
+      padding: 0.25em 1em 1em 0;
+    }
+    & nav {
+      display: block;
+      height: calc(90vh - 84px);
+      bottom: 0;
+      padding: 0.5em 0 2em;
+      overflow: auto;
+      overscroll-behavior: contain;
+      scrollbar-width: thin;
+    }
+    & a.toplink {
+      margin: 8px 0.5em 0;
+    }
+  }
+  img { /* future proofing */
+    max-width: 100%;
+    height: auto;
+  }
+}
+
+/* pagination */
+@media print {
+  body {
+    width: 100%;
+  }
+  p {
+    orphans: 3;
+    widows: 3;
+  }
+  #n-copyright-notice {
+    border-bottom: none;
+  }
+  #toc {
+    page-break-before: always;
+    border-top: none;
+    padding-top: 0;
+  }
+  #n-introduction {
+    page-break-before: always;
+  }
+  figure, pre, .vcard {
+    page-break-inside: avoid;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    page-break-after: avoid;
+  }
+  :is(h2, h3, h4, h5, h6)+*, dd {
+    page-break-before: avoid;
+  }
+  pre {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    font-size: 10pt;
+  }
+  table {
+    border: 1px solid #ddd;
+  }
+  td {
+    border-top: 1px solid #ddd;
+  }
+}
+
+@page :first {
+  padding-top: 0;
+  @top-left {
+    content: normal;
+    border: none;
+  }
+  @top-center {
+    content: normal;
+    border: none;
+  }
+  @top-right {
+    content: normal;
+    border: none;
+  }
+}
+
+@page {
+  size: A4;
+  margin-bottom: 45mm;
+  padding-top: 20px;
+}
+
+/* Dark mode. */
+@media (prefers-color-scheme: dark) {
+:root {
+  --background-color: #121212;
+  --text-color: #f0f0f0;
+  --title-color: #fff;
+  --link-color: #4da4f0;
+  --highlight-color: #282828;
+  --line-color: #444;
+  --pilcrow-weak: #444;
+  --pilcrow-strong: #666;
+  scrollbar-color: #777 #333;
+}
+}
+
+/* SVG Trick: a prefix match works because only black and white are allowed */
+svg {
+  & :is([stroke="black"], [stroke^="#000"]) {
+    stroke: var(--text-color);
+  }
+  & :is([stroke="white"], [stroke^="#fff"]) {
+    stroke: var(--background-color);
+  }
+  & :is([fill="black"], [fill^="#000"], :not([fill])) {
+    fill: var(--text-color);
+  }
+  & :is([fill="white"], [fill^="#fff"]) {
+    fill: var(--background-color);
+  }
+}
+</style>
+
+</head>
+<body class="xml2rfc">
+<table class="ears">
+<thead><tr>
+<td class="left">Internet-Draft</td>
+<td class="center">Intent Admission Assertions</td>
+<td class="right">June 2026</td>
+</tr></thead>
+<tfoot><tr>
+<td class="left">Jiang, et al.</td>
+<td class="center">Expires 1 January 2027</td>
+<td class="right">[Page]</td>
+</tr></tfoot>
+</table>
+<div id="external-metadata" class="document-information"></div>
+<div id="internal-metadata" class="document-information">
+<dl id="identifiers">
+<dt class="label-workgroup">Workgroup:</dt>
+<dd class="workgroup">Web Authorization Protocol</dd>
+<dt class="label-published">Published:</dt>
+<dd class="published">
+<time datetime="2026-06-30" class="published">30 June 2026</time>
+    </dd>
+<dt class="label-intended-status">Intended Status:</dt>
+<dd class="intended-status">Standards Track</dd>
+<dt class="label-expires">Expires:</dt>
+<dd class="expires"><time datetime="2027-01-01">1 January 2027</time></dd>
+<dt class="label-authors">Authors:</dt>
+<dd class="authors">
+<div class="author">
+      <div class="author-name">Y. Jiang</div>
+<div class="org">Huawei</div>
+</div>
+<div class="author">
+      <div class="author-name">L. Li</div>
+<div class="org">Huawei</div>
+</div>
+<div class="author">
+      <div class="author-name">Y. Song</div>
+<div class="org">Huawei</div>
+</div>
+<div class="author">
+      <div class="author-name">F. Liu</div>
+<div class="org">Huawei</div>
+</div>
+</dd>
+</dl>
+</div>
+<h1 id="title">Intent Admission Assertions for Agentic Systems</h1>
+<section id="section-abstract">
+      <h2 id="abstract"><a href="#abstract" class="selfRef">Abstract</a></h2>
+<p id="section-abstract-1">
+        In agentic systems, an intent expressed by a user, application, or agent may be forwarded to a
+        remote system that triggers high-impact actions. If the originator of an intent is not
+        authenticated, is not authorized to request the targeted action, or has not obtained the required
+        consent, the receiving system may act on a forged or unauthorized intent.<a href="#section-abstract-1" class="pilcrow">¶</a></p>
+<p id="section-abstract-2">
+        This document defines the Intent Admission Assertion (IAA): a signed, verifiable artifact by which
+        an admission point authenticates an intent originator, authorizes the request against a permission
+        policy, gates consent-required actions on explicit consent from the user or resource owner, and
+        conveys the result to a downstream execution endpoint that re-verifies it before acting. The IAA is
+        a JSON Web Token whose admission decision is expressed using Rich Authorization Requests (RFC 9396).<a href="#section-abstract-2" class="pilcrow">¶</a></p>
+</section>
+<div id="status-of-memo">
+<section id="section-boilerplate.1">
+        <h2 id="name-status-of-this-memo">
+<a href="#name-status-of-this-memo" class="section-name selfRef">Status of This Memo</a>
+        </h2>
+<p id="section-boilerplate.1-1">
+        This Internet-Draft is submitted in full conformance with the
+        provisions of BCP 78 and BCP 79.<a href="#section-boilerplate.1-1" class="pilcrow">¶</a></p>
+<p id="section-boilerplate.1-2">
+        Internet-Drafts are working documents of the Internet Engineering Task
+        Force (IETF). Note that other groups may also distribute working
+        documents as Internet-Drafts. The list of current Internet-Drafts is
+        at <span><a href="https://datatracker.ietf.org/drafts/current/">https://datatracker.ietf.org/drafts/current/</a></span>.<a href="#section-boilerplate.1-2" class="pilcrow">¶</a></p>
+<p id="section-boilerplate.1-3">
+        Internet-Drafts are draft documents valid for a maximum of six months
+        and may be updated, replaced, or obsoleted by other documents at any
+        time. It is inappropriate to use Internet-Drafts as reference
+        material or to cite them other than as "work in progress."<a href="#section-boilerplate.1-3" class="pilcrow">¶</a></p>
+<p id="section-boilerplate.1-4">
+        This Internet-Draft will expire on 1 January 2027.<a href="#section-boilerplate.1-4" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="copyright">
+<section id="section-boilerplate.2">
+        <h2 id="name-copyright-notice">
+<a href="#name-copyright-notice" class="section-name selfRef">Copyright Notice</a>
+        </h2>
+<p id="section-boilerplate.2-1">
+            Copyright (c) 2026 IETF Trust and the persons identified as the
+            document authors. All rights reserved.<a href="#section-boilerplate.2-1" class="pilcrow">¶</a></p>
+<p id="section-boilerplate.2-2">
+            This document is subject to BCP 78 and the IETF Trust's Legal
+            Provisions Relating to IETF Documents
+            (<span><a href="https://trustee.ietf.org/license-info">https://trustee.ietf.org/license-info</a></span>) in effect on the date of
+            publication of this document. Please review these documents
+            carefully, as they describe your rights and restrictions with
+            respect to this document. Code Components extracted from this
+            document must include Revised BSD License text as described in
+            Section 4.e of the Trust Legal Provisions and are provided without
+            warranty as described in the Revised BSD License.<a href="#section-boilerplate.2-2" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="toc">
+<section id="section-toc.1">
+        <a href="#" onclick="scroll(0,0)" class="toplink">▲</a><h2 id="name-table-of-contents">
+<a href="#name-table-of-contents" class="section-name selfRef">Table of Contents</a>
+        </h2>
+<nav class="toc"><ul class="compact toc ulBare ulEmpty">
+<li class="compact toc ulBare ulEmpty" id="section-toc.1-1.1">
+            <p id="section-toc.1-1.1.1" class="keepWithNext"><a href="#section-1" class="auto internal xref">1</a>.  <a href="#name-introduction" class="internal xref">Introduction</a></p>
+<ul class="compact toc ulBare ulEmpty">
+<li class="compact toc ulBare ulEmpty" id="section-toc.1-1.1.2.1">
+                <p id="section-toc.1-1.1.2.1.1" class="keepWithNext"><a href="#section-1.1" class="auto internal xref">1.1</a>.  <a href="#name-conventions-and-terminology" class="internal xref">Conventions and Terminology</a></p>
+</li>
+            </ul>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.2">
+            <p id="section-toc.1-1.2.1" class="keepWithNext"><a href="#section-2" class="auto internal xref">2</a>.  <a href="#name-overview" class="internal xref">Overview</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.3">
+            <p id="section-toc.1-1.3.1"><a href="#section-3" class="auto internal xref">3</a>.  <a href="#name-the-intent-admission-assert" class="internal xref">The Intent Admission Assertion</a></p>
+<ul class="compact toc ulBare ulEmpty">
+<li class="compact toc ulBare ulEmpty" id="section-toc.1-1.3.2.1">
+                <p id="section-toc.1-1.3.2.1.1"><a href="#section-3.1" class="auto internal xref">3.1</a>.  <a href="#name-format" class="internal xref">Format</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.3.2.2">
+                <p id="section-toc.1-1.3.2.2.1"><a href="#section-3.2" class="auto internal xref">3.2</a>.  <a href="#name-proof-of-possession-and-pre" class="internal xref">Proof of Possession and Presentation Modes</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.3.2.3">
+                <p id="section-toc.1-1.3.2.3.1"><a href="#section-3.3" class="auto internal xref">3.3</a>.  <a href="#name-the-intent_admission-author" class="internal xref">The "intent_admission" Authorization Detail</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.3.2.4">
+                <p id="section-toc.1-1.3.2.4.1"><a href="#section-3.4" class="auto internal xref">3.4</a>.  <a href="#name-intent-binding" class="internal xref">Intent Binding</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.3.2.5">
+                <p id="section-toc.1-1.3.2.5.1"><a href="#section-3.5" class="auto internal xref">3.5</a>.  <a href="#name-consent-evidence" class="internal xref">Consent Evidence</a></p>
+</li>
+            </ul>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.4">
+            <p id="section-toc.1-1.4.1"><a href="#section-4" class="auto internal xref">4</a>.  <a href="#name-issuing-an-intent-admission" class="internal xref">Issuing an Intent Admission Assertion</a></p>
+<ul class="compact toc ulBare ulEmpty">
+<li class="compact toc ulBare ulEmpty" id="section-toc.1-1.4.2.1">
+                <p id="section-toc.1-1.4.2.1.1"><a href="#section-4.1" class="auto internal xref">4.1</a>.  <a href="#name-authenticating-the-origin" class="internal xref">Authenticating the Origin</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.4.2.2">
+                <p id="section-toc.1-1.4.2.2.1"><a href="#section-4.2" class="auto internal xref">4.2</a>.  <a href="#name-authorizing-the-request" class="internal xref">Authorizing the Request</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.4.2.3">
+                <p id="section-toc.1-1.4.2.3.1"><a href="#section-4.3" class="auto internal xref">4.3</a>.  <a href="#name-obtaining-consent" class="internal xref">Obtaining Consent</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.4.2.4">
+                <p id="section-toc.1-1.4.2.4.1"><a href="#section-4.4" class="auto internal xref">4.4</a>.  <a href="#name-constructing-the-iaa" class="internal xref">Constructing the IAA</a></p>
+</li>
+            </ul>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.5">
+            <p id="section-toc.1-1.5.1"><a href="#section-5" class="auto internal xref">5</a>.  <a href="#name-verifying-an-intent-admissi" class="internal xref">Verifying an Intent Admission Assertion</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.6">
+            <p id="section-toc.1-1.6.1"><a href="#section-6" class="auto internal xref">6</a>.  <a href="#name-deployment-considerations" class="internal xref">Deployment Considerations</a></p>
+<ul class="compact toc ulBare ulEmpty">
+<li class="compact toc ulBare ulEmpty" id="section-toc.1-1.6.2.1">
+                <p id="section-toc.1-1.6.2.1.1"><a href="#section-6.1" class="auto internal xref">6.1</a>.  <a href="#name-permission-policy" class="internal xref">Permission Policy</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.6.2.2">
+                <p id="section-toc.1-1.6.2.2.1"><a href="#section-6.2" class="auto internal xref">6.2</a>.  <a href="#name-logging-and-policy-update" class="internal xref">Logging and Policy Update</a></p>
+</li>
+            </ul>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.7">
+            <p id="section-toc.1-1.7.1"><a href="#section-7" class="auto internal xref">7</a>.  <a href="#name-security-considerations" class="internal xref">Security Considerations</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.8">
+            <p id="section-toc.1-1.8.1"><a href="#section-8" class="auto internal xref">8</a>.  <a href="#name-privacy-considerations" class="internal xref">Privacy Considerations</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.9">
+            <p id="section-toc.1-1.9.1"><a href="#section-9" class="auto internal xref">9</a>.  <a href="#name-iana-considerations" class="internal xref">IANA Considerations</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.10">
+            <p id="section-toc.1-1.10.1"><a href="#section-10" class="auto internal xref">10</a>. <a href="#name-normative-references" class="internal xref">Normative References</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.11">
+            <p id="section-toc.1-1.11.1"><a href="#section-11" class="auto internal xref">11</a>. <a href="#name-informative-references" class="internal xref">Informative References</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.12">
+            <p id="section-toc.1-1.12.1"><a href="#appendix-A" class="auto internal xref">Appendix A</a>.  <a href="#name-examples" class="internal xref">Examples</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.13">
+            <p id="section-toc.1-1.13.1"><a href="#appendix-B" class="auto internal xref">Appendix B</a>.  <a href="#name-relationship-to-the-intent-" class="internal xref">Relationship to the Intent Security Requirements</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.14">
+            <p id="section-toc.1-1.14.1"><a href="#appendix-C" class="auto internal xref"></a><a href="#name-acknowledgments" class="internal xref">Acknowledgments</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.15">
+            <p id="section-toc.1-1.15.1"><a href="#appendix-D" class="auto internal xref"></a><a href="#name-authors-addresses" class="internal xref">Authors' Addresses</a></p>
+</li>
+        </ul>
+</nav>
+</section>
+</div>
+<div id="intro">
+<section id="section-1">
+      <h2 id="name-introduction">
+<a href="#section-1" class="section-number selfRef">1. </a><a href="#name-introduction" class="section-name selfRef">Introduction</a>
+      </h2>
+<p id="section-1-1">
+        In agentic systems, intents are produced by users, applications, and agents and forwarded to
+        systems that may trigger high-impact actions, such as purchases, data disclosure, or changes to
+        account or device state. At the point where an intent enters such a system, the receiver often
+        cannot tell whether the intent truly came from the claimed originator, whether that originator is
+        permitted to request the action, or whether the user or resource owner consented. A co-resident
+        malicious application can fabricate an intent that appears to come from the user; an originator
+        running unattended in the background can trigger a high-impact action without consent.<a href="#section-1-1" class="pilcrow">¶</a></p>
+<p id="section-1-2">
+        This document defines the Intent Admission Assertion (IAA), a signed and verifiable artifact that an
+        admission point produces after authenticating the originator, evaluating a permission policy, and
+        (when the policy requires it) obtaining explicit consent from the user or resource owner. The IAA
+        carries the admission decision to the execution endpoint, which re-verifies it before performing the
+        requested action. The design captures these signals at the earliest point at which they are
+        verifiable (the admission point) and enforces them again at a non-bypassable point (the execution
+        endpoint), so that intermediaries that forward the intent need not be trusted.<a href="#section-1-2" class="pilcrow">¶</a></p>
+<p id="section-1-3">
+        The IAA reuses existing building blocks rather than introducing new cryptography. It is a JSON Web
+        Token <span>[<a href="#RFC7519" class="cite xref">RFC7519</a>]</span> following JWT best current practices <span>[<a href="#RFC8725" class="cite xref">RFC8725</a>]</span>; the
+        admission decision is expressed as a Rich Authorization Requests authorization detail
+        <span>[<a href="#RFC9396" class="cite xref">RFC9396</a>]</span>; proof of possession <span>[<a href="#RFC7800" class="cite xref">RFC7800</a>]</span> binds the IAA to an
+        authorized presenter; and the JSON Canonicalization Scheme <span>[<a href="#RFC8785" class="cite xref">RFC8785</a>]</span> provides a
+        stable representation for binding to a JSON intent. An IAA MAY be conveyed as, or alongside, a
+        transaction token <span>[<a href="#I-D.ietf-oauth-transaction-tokens" class="cite xref">I-D.ietf-oauth-transaction-tokens</a>]</span> or its agent profile
+        <span>[<a href="#I-D.araut-oauth-transaction-tokens-for-agents" class="cite xref">I-D.araut-oauth-transaction-tokens-for-agents</a>]</span>; related profiles include the
+        agent-to-agent OAuth profile <span>[<a href="#I-D.liu-oauth-a2a-profile" class="cite xref">I-D.liu-oauth-a2a-profile</a>]</span> and agentic JWT
+        <span>[<a href="#I-D.goswami-agentic-jwt" class="cite xref">I-D.goswami-agentic-jwt</a>]</span>.<a href="#section-1-3" class="pilcrow">¶</a></p>
+<p id="section-1-4">
+        A fuller threat model and the security requirements that motivate this profile are described in
+        <span>[<a href="#I-D.jiang-intent-security" class="cite xref">I-D.jiang-intent-security</a>]</span> and <span>[<a href="#I-D.ni-a2a-ai-agent-security-requirements" class="cite xref">I-D.ni-a2a-ai-agent-security-requirements</a>]</span>;
+        <a href="#app-relationship" class="auto internal xref">Appendix B</a> maps the behavior defined here onto those requirements.<a href="#section-1-4" class="pilcrow">¶</a></p>
+<div id="conventions">
+<section id="section-1.1">
+        <h3 id="name-conventions-and-terminology">
+<a href="#section-1.1" class="section-number selfRef">1.1. </a><a href="#name-conventions-and-terminology" class="section-name selfRef">Conventions and Terminology</a>
+        </h3>
+<p id="section-1.1-1">
+          The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT",
+          "RECOMMENDED", "NOT RECOMMENDED", "MAY", and "OPTIONAL" in this document are to be interpreted as
+          described in BCP 14 <span>[<a href="#RFC2119" class="cite xref">RFC2119</a>]</span> <span>[<a href="#RFC8174" class="cite xref">RFC8174</a>]</span> when, and only when, they
+          appear in all capitals, as shown here.<a href="#section-1.1-1" class="pilcrow">¶</a></p>
+<p id="section-1.1-2">
+          The terms Intent, Intent Originator, and Admission Control are used as in
+          <span>[<a href="#I-D.jiang-intent-security" class="cite xref">I-D.jiang-intent-security</a>]</span>. This document additionally uses:<a href="#section-1.1-2" class="pilcrow">¶</a></p>
+<span class="break"></span><dl class="dlParallel" id="section-1.1-3">
+          <dt id="section-1.1-3.1">Intent:</dt>
+          <dd style="margin-left: 1.5em" id="section-1.1-3.2">A declarative request, produced by an Intent Originator, for a targeted action or service.<a href="#section-1.1-3.2" class="pilcrow">¶</a>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-1.1-3.3">Intent Originator:</dt>
+          <dd style="margin-left: 1.5em" id="section-1.1-3.4">The entity that produces an intent, e.g., an application, an operating system component, or an
+              agent.<a href="#section-1.1-3.4" class="pilcrow">¶</a>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-1.1-3.5">Intent Admission Assertion (IAA):</dt>
+          <dd style="margin-left: 1.5em" id="section-1.1-3.6">The verifiable artifact defined by this document, issued by an Admission Point upon admitting
+              an intent.<a href="#section-1.1-3.6" class="pilcrow">¶</a>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-1.1-3.7">Admission Point (AP):</dt>
+          <dd style="margin-left: 1.5em" id="section-1.1-3.8">The entity that authenticates the originator, evaluates the permission policy, obtains consent
+              where required, and issues an IAA. It MAY act as, or interact with, an OAuth authorization
+              server or assertion issuer.<a href="#section-1.1-3.8" class="pilcrow">¶</a>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-1.1-3.9">Execution Endpoint (EE):</dt>
+          <dd style="margin-left: 1.5em" id="section-1.1-3.10">The entity that re-verifies an IAA and performs, or refuses, the requested action; it acts as
+              an OAuth <span>[<a href="#RFC6749" class="cite xref">RFC6749</a>]</span> resource server.<a href="#section-1.1-3.10" class="pilcrow">¶</a>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-1.1-3.11">Permission Policy:</dt>
+          <dd style="margin-left: 1.5em" id="section-1.1-3.12">Policy determining which originators may request which actions, and which actions require
+              consent.<a href="#section-1.1-3.12" class="pilcrow">¶</a>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-1.1-3.13">Policy Authority:</dt>
+          <dd style="margin-left: 1.5em" id="section-1.1-3.14">The entity that maintains the Permission Policy.<a href="#section-1.1-3.14" class="pilcrow">¶</a>
+</dd>
+        <dd class="break"></dd>
+</dl>
+</section>
+</div>
+</section>
+</div>
+<div id="overview">
+<section id="section-2">
+      <h2 id="name-overview">
+<a href="#section-2" class="section-number selfRef">2. </a><a href="#name-overview" class="section-name selfRef">Overview</a>
+      </h2>
+<p id="section-2-1">
+        Three roles participate in admitting and acting on an intent. The Intent Originator produces the
+        intent and holds an identity credential. The Admission Point sits where the intent enters the
+        system: it authenticates the originator, decides whether the request is permitted, obtains consent
+        when the policy requires it, and, on a positive decision, issues an IAA. The Execution Endpoint
+        performs the action; before doing so it verifies the IAA. A Policy Authority maintains the policy
+        the Admission Point and Execution Endpoint apply.<a href="#section-2-1" class="pilcrow">¶</a></p>
+<p id="section-2-2">
+        Originator identity is established by an identity credential. For workload originators, such as
+        cloud agents or services, deployments can use WIMSE workload credentials
+        <span>[<a href="#I-D.ietf-wimse-workload-creds" class="cite xref">I-D.ietf-wimse-workload-creds</a>]</span>, with the identifiers and terminology of
+        <span>[<a href="#I-D.ietf-wimse-arch" class="cite xref">I-D.ietf-wimse-arch</a>]</span> and <span>[<a href="#I-D.ietf-wimse-identifier" class="cite xref">I-D.ietf-wimse-identifier</a>]</span>. Local
+        originators, such as on-device applications or operating system components, can instead use a
+        platform identity, application attestation, or a device-bound key; not every originator is a WIMSE
+        workload. Request-level proof of possession can reuse WIMSE request protection
+        <span>[<a href="#I-D.ietf-wimse-http-signature" class="cite xref">I-D.ietf-wimse-http-signature</a>]</span>.<a href="#section-2-2" class="pilcrow">¶</a></p>
+<span id="name-intent-admission-flow"></span><div id="fig-flow">
+<figure id="figure-1">
+        <div class="alignLeft art-ascii-art art-text artwork" id="section-2-3.1">
+<pre>
+ +------------+   intent +        +-----------------------+
+ |  Intent    |   credential      |    Admission Point    |
+ | Originator |------------------&gt;| - authenticate origin |
+ | (app / OS  |                   | - authorize request   |
+ |  / agent)  |                   | - obtain consent      |
+ +------------+                   |   (when required)      |
+                                  +-----------+-----------+
+                                              |
+                                  Intent Admission Assertion
+                                  (signed JWT)
+                                              v
+                                     [ relay / network ]
+                                              |
+                                              v
+                                  +-----------------------+
+                                  |   Execution Endpoint  |
+                                  | - verify the IAA      |
+                                  | - act, or refuse      |
+                                  +-----------------------+
+</pre>
+</div>
+<figcaption><a href="#figure-1" class="selfRef">Figure 1</a>:
+<a href="#name-intent-admission-flow" class="selfRef">Intent admission flow</a>
+        </figcaption></figure>
+</div>
+<p id="section-2-4">
+        The intent and the IAA may pass through relays, gateways, or other intermediaries that are not
+        trusted to preserve them. The IAA is therefore self-protecting: it is signed, bound to the intent,
+        and bound to an authorized presenter, so that an intermediary can forward it but cannot forge or
+        repurpose it, and the Execution Endpoint can verify it independently of any transport-layer
+        protection.<a href="#section-2-4" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="iaa">
+<section id="section-3">
+      <h2 id="name-the-intent-admission-assert">
+<a href="#section-3" class="section-number selfRef">3. </a><a href="#name-the-intent-admission-assert" class="section-name selfRef">The Intent Admission Assertion</a>
+      </h2>
+<div id="iaa-format">
+<section id="section-3.1">
+        <h3 id="name-format">
+<a href="#section-3.1" class="section-number selfRef">3.1. </a><a href="#name-format" class="section-name selfRef">Format</a>
+        </h3>
+<p id="section-3.1-1">
+          An IAA is a JWT <span>[<a href="#RFC7519" class="cite xref">RFC7519</a>]</span> protected as a JWS, and MUST follow
+          <span>[<a href="#RFC8725" class="cite xref">RFC8725</a>]</span>. It contains the following registered claims:<a href="#section-3.1-1" class="pilcrow">¶</a></p>
+<span class="break"></span><dl class="dlParallel" id="section-3.1-2">
+          <dt id="section-3.1-2.1">iss:</dt>
+          <dd style="margin-left: 1.5em" id="section-3.1-2.2">Identifier of the Admission Point that issued the IAA.<a href="#section-3.1-2.2" class="pilcrow">¶</a>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-3.1-2.3">aud:</dt>
+          <dd style="margin-left: 1.5em" id="section-3.1-2.4">The intended Execution Endpoint(s). An Execution Endpoint MUST reject an IAA
+              whose "aud" does not include it.<a href="#section-3.1-2.4" class="pilcrow">¶</a>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-3.1-2.5">iat, exp:</dt>
+          <dd style="margin-left: 1.5em" id="section-3.1-2.6">Issuance and expiry. The validity period SHOULD be short.<a href="#section-3.1-2.6" class="pilcrow">¶</a>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-3.1-2.7">jti:</dt>
+          <dd style="margin-left: 1.5em" id="section-3.1-2.8">A unique identifier used for replay detection.<a href="#section-3.1-2.8" class="pilcrow">¶</a>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-3.1-2.9">cnf:</dt>
+          <dd style="margin-left: 1.5em" id="section-3.1-2.10">A confirmation claim <span>[<a href="#RFC7800" class="cite xref">RFC7800</a>]</span> identifying the key of the
+              authorized presenter (<a href="#iaa-pop" class="auto internal xref">Section 3.2</a>). When the "jkt" (JWK SHA-256 Thumbprint)
+              confirmation method is used, it follows <span>[<a href="#RFC9449" class="cite xref">RFC9449</a>]</span>.<a href="#section-3.1-2.10" class="pilcrow">¶</a>
+</dd>
+        <dd class="break"></dd>
+</dl>
+<p id="section-3.1-3">
+          The admission decision is carried as an authorization detail (<a href="#iaa-rar" class="auto internal xref">Section 3.3</a>). A CBOR
+          Web Token / COSE encoding may be defined by a future profile and is out of scope for this
+          document.<a href="#section-3.1-3" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="iaa-pop">
+<section id="section-3.2">
+        <h3 id="name-proof-of-possession-and-pre">
+<a href="#section-3.2" class="section-number selfRef">3.2. </a><a href="#name-proof-of-possession-and-pre" class="section-name selfRef">Proof of Possession and Presentation Modes</a>
+        </h3>
+<p id="section-3.2-1">
+          Because an IAA may traverse relays and gateways, the party that presents it to the Execution
+          Endpoint is not necessarily the Originator. The "cnf" claim therefore binds the IAA to the key of
+          the authorized presenter, according to the presentation mode:<a href="#section-3.2-1" class="pilcrow">¶</a></p>
+<span class="break"></span><dl class="dlNewline" id="section-3.2-2">
+          <dt id="section-3.2-2.1">Direct presentation:</dt>
+          <dd style="margin-left: 1.5em" id="section-3.2-2.2">The Originator presents the IAA directly to the Execution Endpoint, the "presenter" member
+              (<a href="#iaa-rar" class="auto internal xref">Section 3.3</a>) has "mode" of "direct", and "cnf" binds the Originator's key.<a href="#section-3.2-2.2" class="pilcrow">¶</a>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-3.2-2.3">Delegated presentation:</dt>
+          <dd style="margin-left: 1.5em" id="section-3.2-2.4">An authorized presenter (for example, the Admission Point, a gateway, an agent runtime, or a
+              relay) presents the IAA on the Originator's behalf. The "presenter" member identifies that
+              presenter with "mode" of "delegated", "cnf" binds the authorized presenter's key, and the IAA
+              retains the authenticated Originator identity in the "originator" member.<a href="#section-3.2-2.4" class="pilcrow">¶</a>
+</dd>
+        <dd class="break"></dd>
+</dl>
+<p id="section-3.2-3">
+          The Execution Endpoint MUST verify the "cnf" proof against the key of the actual presenting party,
+          and MUST verify that the presenting party is the authorized presenter identified by the
+          "presenter" member.<a href="#section-3.2-3" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="iaa-rar">
+<section id="section-3.3">
+        <h3 id="name-the-intent_admission-author">
+<a href="#section-3.3" class="section-number selfRef">3.3. </a><a href="#name-the-intent_admission-author" class="section-name selfRef">The "intent_admission" Authorization Detail</a>
+        </h3>
+<p id="section-3.3-1">
+          The admission decision is a single Rich Authorization Requests <span>[<a href="#RFC9396" class="cite xref">RFC9396</a>]</span>
+          authorization detail object with "type" set to "intent_admission", carried in the
+          "authorization_details" claim of the IAA. The value "intent_admission" MAY be used where the type
+          namespace is local to the issuer; deployments requiring cross-issuer interoperability SHOULD use a
+          collision-resistant type value, such as a URI under their administrative control. Following
+          <span>[<a href="#RFC9396" class="cite xref">RFC9396</a>]</span>, the common data fields "actions", "locations", and "datatypes" appear at
+          the top level of the object. The object has the following members:<a href="#section-3.3-1" class="pilcrow">¶</a></p>
+<span class="break"></span><dl class="dlParallel" id="section-3.3-2">
+          <dt id="section-3.3-2.1">intent_ref (REQUIRED):</dt>
+          <dd style="margin-left: 1.5em" id="section-3.3-2.2">A binding to the admitted intent (<a href="#iaa-binding" class="auto internal xref">Section 3.4</a>): a JSON object with members
+              "hash_alg", "digest" (base64url), and "canonicalization".<a href="#section-3.3-2.2" class="pilcrow">¶</a>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-3.3-2.3">originator (REQUIRED):</dt>
+          <dd style="margin-left: 1.5em" id="section-3.3-2.4">A JSON object describing the authenticated originator, with members "id" (the originator
+              identity, e.g., a WIMSE identifier), "class" (e.g., "application", "os_component", or
+              "agent"), "execution_context" (where available, one of "foreground", "unattended",
+              "delegated_background", or "scheduled"), and OPTIONAL "attestation" (a reference to attested
+              application/workload state). Raw behavioral history is not included
+              (<a href="#privacy" class="auto internal xref">Section 8</a>).<a href="#section-3.3-2.4" class="pilcrow">¶</a>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-3.3-2.5">presenter (REQUIRED):</dt>
+          <dd style="margin-left: 1.5em" id="section-3.3-2.6">A JSON object identifying the party authorized to present the IAA: "id" (the presenter
+              identity), "mode" ("direct" or "delegated"), and OPTIONAL "cnf_ref" (the confirmation method
+              in "cnf" bound to this presenter, e.g., "jkt"). In "direct" mode, "id" equals the originator's
+              "id".<a href="#section-3.3-2.6" class="pilcrow">¶</a>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-3.3-2.7">actions, locations, datatypes:</dt>
+          <dd style="margin-left: 1.5em" id="section-3.3-2.8">The admitted action(s), resource location(s), and data type(s), using the common data fields
+              of <span>[<a href="#RFC9396" class="cite xref">RFC9396</a>]</span>.<a href="#section-3.3-2.8" class="pilcrow">¶</a>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-3.3-2.9">decision (REQUIRED):</dt>
+          <dd style="margin-left: 1.5em" id="section-3.3-2.10">The admission outcome. This profile defines only the value "admit"; rejected or escalated
+              intents do not yield an IAA. The member is retained for audit clarity.<a href="#section-3.3-2.10" class="pilcrow">¶</a>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-3.3-2.11">consent_required (REQUIRED):</dt>
+          <dd style="margin-left: 1.5em" id="section-3.3-2.12">A boolean indicating whether the Permission Policy requires explicit consent for this request
+              (<a href="#issue-consent" class="auto internal xref">Section 4.3</a>).<a href="#section-3.3-2.12" class="pilcrow">¶</a>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-3.3-2.13">consent (REQUIRED when "consent_required" is true):</dt>
+          <dd style="margin-left: 1.5em" id="section-3.3-2.14">Evidence of consent (<a href="#iaa-consent" class="auto internal xref">Section 3.5</a>).<a href="#section-3.3-2.14" class="pilcrow">¶</a>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-3.3-2.15">constraints (OPTIONAL):</dt>
+          <dd style="margin-left: 1.5em" id="section-3.3-2.16">A constraint envelope carried for downstream constraint or semantic checks.<a href="#section-3.3-2.16" class="pilcrow">¶</a>
+</dd>
+        <dd class="break"></dd>
+</dl>
+</section>
+</div>
+<div id="iaa-binding">
+<section id="section-3.4">
+        <h3 id="name-intent-binding">
+<a href="#section-3.4" class="section-number selfRef">3.4. </a><a href="#name-intent-binding" class="section-name selfRef">Intent Binding</a>
+        </h3>
+<p id="section-3.4-1">
+          The IAA is bound to the specific intent it admits, so that it cannot be replayed against a
+          different intent. The "intent_ref" member carries a digest of the admitted intent together with
+          the parameters needed to reproduce it.<a href="#section-3.4-1" class="pilcrow">¶</a></p>
+<p id="section-3.4-2">
+          If the admitted intent is a JSON object, the digest input MUST be the JSON Canonicalization Scheme
+          <span>[<a href="#RFC8785" class="cite xref">RFC8785</a>]</span> representation of that object, and "canonicalization" MUST be "jcs". If
+          the admitted intent is not JSON, the digest input MUST be the exact octet sequence received by the
+          Admission Point, and "canonicalization" MUST be "none". The hash algorithm identifier is carried
+          in "hash_alg"; implementations MUST support "sha-256" and MUST NOT use MD5 or SHA-1.<a href="#section-3.4-2" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="iaa-consent">
+<section id="section-3.5">
+        <h3 id="name-consent-evidence">
+<a href="#section-3.5" class="section-number selfRef">3.5. </a><a href="#name-consent-evidence" class="section-name selfRef">Consent Evidence</a>
+        </h3>
+<p id="section-3.5-1">
+          When "consent_required" is true, the "consent" object MUST be present; its presence indicates that
+          consent was obtained, since an IAA is not issued when required consent is refused or absent. The
+          object provides evidence of consent and does not define user-interface behavior. Its members are:<a href="#section-3.5-1" class="pilcrow">¶</a></p>
+<span class="break"></span><dl class="dlParallel" id="section-3.5-2">
+          <dt id="section-3.5-2.1">method (REQUIRED):</dt>
+          <dd style="margin-left: 1.5em" id="section-3.5-2.2">How consent was obtained, e.g., "user_confirmation",
+              "prior_grant", or "step_up".<a href="#section-3.5-2.2" class="pilcrow">¶</a>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-3.5-2.3">time (REQUIRED):</dt>
+          <dd style="margin-left: 1.5em" id="section-3.5-2.4">The time consent was obtained.<a href="#section-3.5-2.4" class="pilcrow">¶</a>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-3.5-2.5">scope_ref (REQUIRED):</dt>
+          <dd style="margin-left: 1.5em" id="section-3.5-2.6">A reference binding the consent to this admitted intent and
+              scope. The value MUST be derived from, or otherwise uniquely reference, the admitted intent,
+              the admitted action/resource scope, and any constraints that were presented for consent.<a href="#section-3.5-2.6" class="pilcrow">¶</a>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-3.5-2.7">evidence_ref (OPTIONAL):</dt>
+          <dd style="margin-left: 1.5em" id="section-3.5-2.8">A reference to evidence retained locally or by the Admission
+              Point. It MUST NOT expose raw user-interface content, behavioral history, or a full user
+              profile.<a href="#section-3.5-2.8" class="pilcrow">¶</a>
+</dd>
+        <dd class="break"></dd>
+</dl>
+</section>
+</div>
+</section>
+</div>
+<div id="issue">
+<section id="section-4">
+      <h2 id="name-issuing-an-intent-admission">
+<a href="#section-4" class="section-number selfRef">4. </a><a href="#name-issuing-an-intent-admission" class="section-name selfRef">Issuing an Intent Admission Assertion</a>
+      </h2>
+<p id="section-4-1">
+        An Admission Point admits an intent, and issues an IAA, only after the following steps succeed.<a href="#section-4-1" class="pilcrow">¶</a></p>
+<div id="issue-authn">
+<section id="section-4.1">
+        <h3 id="name-authenticating-the-origin">
+<a href="#section-4.1" class="section-number selfRef">4.1. </a><a href="#name-authenticating-the-origin" class="section-name selfRef">Authenticating the Origin</a>
+        </h3>
+<p id="section-4.1-1">
+          The Admission Point MUST authenticate the Originator and verify the binding between the intent and
+          the Originator identity. The originator authentication mechanism MUST cover, or be bound to, the
+          submitted intent or an unambiguous digest of it, so that an originator credential cannot be paired
+          with a different intent; the specific mechanism (e.g., an HTTP Message Signature, a DPoP-like
+          proof, an attestation-bound request, or a local OS-mediated call) is not specified here. An intent
+          whose origin cannot be verified MUST NOT be admitted.<a href="#section-4.1-1" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="issue-authz">
+<section id="section-4.2">
+        <h3 id="name-authorizing-the-request">
+<a href="#section-4.2" class="section-number selfRef">4.2. </a><a href="#name-authorizing-the-request" class="section-name selfRef">Authorizing the Request</a>
+        </h3>
+<p id="section-4.2-1">
+          The Admission Point evaluates the authenticated Originator against the Permission Policy, using
+          risk-relevant originator attributes such as identifier, class, execution context, attested state,
+          or locally maintained risk signals. The Admission Point MUST NOT admit the intent if the requested
+          action is not permitted for that originator by the policy, if the originator is not permitted by
+          the policy, or if the originator's execution context is one the policy disallows (for example,
+          unattended background execution).<a href="#section-4.2-1" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="issue-consent">
+<section id="section-4.3">
+        <h3 id="name-obtaining-consent">
+<a href="#section-4.3" class="section-number selfRef">4.3. </a><a href="#name-obtaining-consent" class="section-name selfRef">Obtaining Consent</a>
+        </h3>
+<p id="section-4.3-1">
+          This document does not define a global taxonomy of high-impact actions. Whether an action requires
+          consent is determined by the Permission Policy, which may mark a service, action, data type,
+          amount, target resource, or execution context as requiring explicit consent from the user or
+          resource owner. When the policy so requires, the Admission Point sets "consent_required" to true,
+          MUST obtain and verify explicit consent, and MUST include the corresponding "consent" evidence in
+          the IAA. If consent is absent or refused, the intent MUST NOT be admitted.<a href="#section-4.3-1" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="issue-construct">
+<section id="section-4.4">
+        <h3 id="name-constructing-the-iaa">
+<a href="#section-4.4" class="section-number selfRef">4.4. </a><a href="#name-constructing-the-iaa" class="section-name selfRef">Constructing the IAA</a>
+        </h3>
+<p id="section-4.4-1">
+          On admission, the Admission Point constructs the IAA per <a href="#iaa" class="auto internal xref">Section 3</a>, binds it to the
+          intent (<a href="#iaa-binding" class="auto internal xref">Section 3.4</a>) and to an authorized presenter key (<a href="#iaa-pop" class="auto internal xref">Section 3.2</a>),
+          signs it, and returns it for forwarding.<a href="#section-4.4-1" class="pilcrow">¶</a></p>
+</section>
+</div>
+</section>
+</div>
+<div id="verify">
+<section id="section-5">
+      <h2 id="name-verifying-an-intent-admissi">
+<a href="#section-5" class="section-number selfRef">5. </a><a href="#name-verifying-an-intent-admissi" class="section-name selfRef">Verifying an Intent Admission Assertion</a>
+      </h2>
+<p id="section-5-1">
+        Before performing a requested action, the Execution Endpoint MUST:<a href="#section-5-1" class="pilcrow">¶</a></p>
+<ol start="1" type="1" class="normal type-1" id="section-5-2">
+        <li id="section-5-2.1">verify the JWS signature and that "iss" is a trusted Admission Point;<a href="#section-5-2.1" class="pilcrow">¶</a>
+</li>
+        <li id="section-5-2.2">verify "aud" includes this Execution Endpoint and that the IAA is within its validity period;<a href="#section-5-2.2" class="pilcrow">¶</a>
+</li>
+        <li id="section-5-2.3">verify the "cnf" proof of possession against the actual presenting party's key, and verify that
+            the presenting party is the authorized presenter identified by "presenter"
+            (<a href="#iaa-pop" class="auto internal xref">Section 3.2</a>);<a href="#section-5-2.3" class="pilcrow">¶</a>
+</li>
+        <li id="section-5-2.4">detect replay using "jti";<a href="#section-5-2.4" class="pilcrow">¶</a>
+</li>
+        <li id="section-5-2.5">verify "intent_ref" matches the intent being acted upon (<a href="#iaa-binding" class="auto internal xref">Section 3.4</a>);<a href="#section-5-2.5" class="pilcrow">¶</a>
+</li>
+        <li id="section-5-2.6">verify that the requested action and all action parameters are within the admitted
+            action/resource scope (the "actions", "locations", and "datatypes") and any applicable
+            "constraints"; if a constraint carried in the IAA cannot be interpreted or enforced, the
+            Execution Endpoint MUST refuse the action unless local policy explicitly permits ignoring that
+            constraint;<a href="#section-5-2.6" class="pilcrow">¶</a>
+</li>
+        <li id="section-5-2.7">when "consent_required" is true, verify that valid "consent" evidence is present.<a href="#section-5-2.7" class="pilcrow">¶</a>
+</li>
+      </ol>
+<p id="section-5-3">
+        These checks are the authoritative gate: the Execution Endpoint enforces them so that no side path
+        can bypass them. If any check fails, the Execution Endpoint MUST refuse the action and SHOULD record
+        audit evidence.<a href="#section-5-3" class="pilcrow">¶</a></p>
+<p id="section-5-4">
+        For defense in depth, an Execution Endpoint may independently evaluate the Originator and the
+        requested action against its own copy of the Permission Policy, applying the conditions of
+        <a href="#issue-authz" class="auto internal xref">Section 4.2</a> and <a href="#issue-consent" class="auto internal xref">Section 4.3</a>, rather than relying solely on the
+        Admission Point's decision. Where the policy indicates that additional originator information is
+        required, or the action is of a predetermined sensitive type, the Execution Endpoint SHOULD request
+        an updated or re-issued IAA carrying the required minimized attributes, rather than relying on ad
+        hoc attributes obtained outside the assertion.<a href="#section-5-4" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="deployment">
+<section id="section-6">
+      <h2 id="name-deployment-considerations">
+<a href="#section-6" class="section-number selfRef">6. </a><a href="#name-deployment-considerations" class="section-name selfRef">Deployment Considerations</a>
+      </h2>
+<div id="dep-policy">
+<section id="section-6.1">
+        <h3 id="name-permission-policy">
+<a href="#section-6.1" class="section-number selfRef">6.1. </a><a href="#name-permission-policy" class="section-name selfRef">Permission Policy</a>
+        </h3>
+<p id="section-6.1-1">
+          This document does not define a policy language. A conforming deployment is able to determine, for
+          a given authenticated originator, requested action, execution context, and consent requirement,
+          whether an IAA may be issued. Binding to a specific policy language or engine is out of scope.<a href="#section-6.1-1" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="dep-logging">
+<section id="section-6.2">
+        <h3 id="name-logging-and-policy-update">
+<a href="#section-6.2" class="section-number selfRef">6.2. </a><a href="#name-logging-and-policy-update" class="section-name selfRef">Logging and Policy Update</a>
+        </h3>
+<p id="section-6.2-1">
+          Admission Points and Execution Endpoints may emit log records associated with an originator and/or
+          an action, supporting auditability and policy-driven response. Such records carry the same privacy
+          obligations as IAAs (<a href="#privacy" class="auto internal xref">Section 8</a>): raw behavioral history is not exported, and
+          reported attributes are minimized. The transport, cadence, aggregation, and policy-update
+          mechanism for such records are deployment-specific and out of scope.<a href="#section-6.2-1" class="pilcrow">¶</a></p>
+</section>
+</div>
+</section>
+</div>
+<div id="security">
+<section id="section-7">
+      <h2 id="name-security-considerations">
+<a href="#section-7" class="section-number selfRef">7. </a><a href="#name-security-considerations" class="section-name selfRef">Security Considerations</a>
+      </h2>
+<p id="section-7-1">
+        The IAA is a sensitive artifact. Proof of possession ("cnf") is REQUIRED to prevent a stolen IAA
+        from being presented by an unauthorized party; the proof binds to the authorized presenter per the
+        presentation mode (<a href="#iaa-pop" class="auto internal xref">Section 3.2</a>). Short validity, "jti"-based replay detection, and
+        audience restriction further limit misuse. Because the IAA may traverse untrusted intermediaries,
+        its integrity and binding do not rely on transport security.<a href="#section-7-1" class="pilcrow">¶</a></p>
+<p id="section-7-2">
+        Admission Point compromise: a compromised Admission Point can issue IAAs for arbitrary originators.
+        Admission Point signing keys MUST be protected, rotated, and revocable, and Execution Endpoints
+        SHOULD constrain the set of trusted issuers and the originators an issuer may assert.<a href="#section-7-2" class="pilcrow">¶</a></p>
+<p id="section-7-3">
+        Intent binding: without "intent_ref", an IAA could be replayed against a different intent. The
+        canonicalization and hash requirements of <a href="#iaa-binding" class="auto internal xref">Section 3.4</a> prevent rebinding; algorithm
+        agility allows migration away from weakened hashes.<a href="#section-7-3" class="pilcrow">¶</a></p>
+<p id="section-7-4">
+        Algorithm downgrade: Execution Endpoints MUST reject IAAs that use disallowed signature or hash
+        algorithms, and MUST NOT accept "alg":"none".<a href="#section-7-4" class="pilcrow">¶</a></p>
+<p id="section-7-5">
+        Attestation freshness: where "attestation" is used, Execution Endpoints SHOULD verify its freshness,
+        as stale attestation can mask a changed originator state.<a href="#section-7-5" class="pilcrow">¶</a></p>
+<p id="section-7-6">
+        Replay detection SHOULD be scoped at least by ("iss", "jti") and retained until the IAA expires. If
+        an IAA has multiple audiences, replay-detection state is maintained consistently across the relevant
+        audiences, or the IAA is audience-restricted to a single Execution Endpoint.<a href="#section-7-6" class="pilcrow">¶</a></p>
+<p id="section-7-7">
+        Confidentiality: a JWS-protected IAA provides integrity but not confidentiality. If an IAA contains
+        deployment-sensitive or privacy-sensitive attributes, deployments SHOULD use encryption (e.g., a
+        JWE), an opaque reference, or an end-to-end protected channel between the Admission Point and the
+        Execution Endpoint.<a href="#section-7-7" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="privacy">
+<section id="section-8">
+      <h2 id="name-privacy-considerations">
+<a href="#section-8" class="section-number selfRef">8. </a><a href="#name-privacy-considerations" class="section-name selfRef">Privacy Considerations</a>
+      </h2>
+<p id="section-8-1">
+        An IAA SHOULD avoid exposing raw local state or behavioral history to downstream entities.
+        Originator attributes are minimized to those relevant to the admission decision, and coarse-grained
+        decisions or policy references are preferred over detailed originator profiles. Consent evidence
+        references (<a href="#iaa-consent" class="auto internal xref">Section 3.5</a>) MUST NOT expose raw user-interface content, behavioral
+        history, or a full user profile.<a href="#section-8-1" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="iana">
+<section id="section-9">
+      <h2 id="name-iana-considerations">
+<a href="#section-9" class="section-number selfRef">9. </a><a href="#name-iana-considerations" class="section-name selfRef">IANA Considerations</a>
+      </h2>
+<p id="section-9-1">
+        This document does not request any IANA actions. The "authorization_details" JWT claim is already
+        registered by <span>[<a href="#RFC9396" class="cite xref">RFC9396</a>]</span>. This document defines a new authorization details type
+        value, "intent_admission", for use by deployments supporting this profile. As
+        <span>[<a href="#RFC9396" class="cite xref">RFC9396</a>]</span> does not establish a central registry for authorization details type
+        values, "intent_admission" is a deployment-local value; deployments requiring cross-issuer
+        interoperability use a collision-resistant value as described in <a href="#iaa-rar" class="auto internal xref">Section 3.3</a>.<a href="#section-9-1" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="refs-normative">
+<section id="section-10">
+      <h2 id="name-normative-references">
+<a href="#section-10" class="section-number selfRef">10. </a><a href="#name-normative-references" class="section-name selfRef">Normative References</a>
+      </h2>
+<dl class="references">
+<dt id="RFC2119">[RFC2119]</dt>
+      <dd>
+<span class="refAuthor">Bradner, S.</span>, <span class="refTitle">"Key words for use in RFCs to Indicate Requirement Levels"</span>, <span class="seriesInfo">BCP 14</span>, <span class="seriesInfo">RFC 2119</span>, <span class="seriesInfo">DOI 10.17487/RFC2119</span>, <time datetime="1997-03" class="refDate">March 1997</time>, <span>&lt;<a href="https://www.rfc-editor.org/info/rfc2119">https://www.rfc-editor.org/info/rfc2119</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="RFC7519">[RFC7519]</dt>
+      <dd>
+<span class="refAuthor">Jones, M.</span>, <span class="refAuthor">Bradley, J.</span>, and <span class="refAuthor">N. Sakimura</span>, <span class="refTitle">"JSON Web Token (JWT)"</span>, <span class="seriesInfo">RFC 7519</span>, <span class="seriesInfo">DOI 10.17487/RFC7519</span>, <time datetime="2015-05" class="refDate">May 2015</time>, <span>&lt;<a href="https://www.rfc-editor.org/info/rfc7519">https://www.rfc-editor.org/info/rfc7519</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="RFC7800">[RFC7800]</dt>
+      <dd>
+<span class="refAuthor">Jones, M.</span>, <span class="refAuthor">Bradley, J.</span>, and <span class="refAuthor">H. Tschofenig</span>, <span class="refTitle">"Proof-of-Possession Key Semantics for JSON Web Tokens (JWTs)"</span>, <span class="seriesInfo">RFC 7800</span>, <span class="seriesInfo">DOI 10.17487/RFC7800</span>, <time datetime="2016-04" class="refDate">April 2016</time>, <span>&lt;<a href="https://www.rfc-editor.org/info/rfc7800">https://www.rfc-editor.org/info/rfc7800</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="RFC8174">[RFC8174]</dt>
+      <dd>
+<span class="refAuthor">Leiba, B.</span>, <span class="refTitle">"Ambiguity of Uppercase vs Lowercase in RFC 2119 Key Words"</span>, <span class="seriesInfo">BCP 14</span>, <span class="seriesInfo">RFC 8174</span>, <span class="seriesInfo">DOI 10.17487/RFC8174</span>, <time datetime="2017-05" class="refDate">May 2017</time>, <span>&lt;<a href="https://www.rfc-editor.org/info/rfc8174">https://www.rfc-editor.org/info/rfc8174</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="RFC8725">[RFC8725]</dt>
+      <dd>
+<span class="refAuthor">Sheffer, Y.</span>, <span class="refAuthor">Hardt, D.</span>, and <span class="refAuthor">M. Jones</span>, <span class="refTitle">"JSON Web Token Best Current Practices"</span>, <span class="seriesInfo">BCP 225</span>, <span class="seriesInfo">RFC 8725</span>, <span class="seriesInfo">DOI 10.17487/RFC8725</span>, <time datetime="2020-02" class="refDate">February 2020</time>, <span>&lt;<a href="https://www.rfc-editor.org/info/rfc8725">https://www.rfc-editor.org/info/rfc8725</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="RFC8785">[RFC8785]</dt>
+      <dd>
+<span class="refAuthor">Rundgren, A.</span>, <span class="refAuthor">Jordan, B.</span>, and <span class="refAuthor">S. Erdtman</span>, <span class="refTitle">"JSON Canonicalization Scheme (JCS)"</span>, <span class="seriesInfo">RFC 8785</span>, <span class="seriesInfo">DOI 10.17487/RFC8785</span>, <time datetime="2020-06" class="refDate">June 2020</time>, <span>&lt;<a href="https://www.rfc-editor.org/info/rfc8785">https://www.rfc-editor.org/info/rfc8785</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="RFC9396">[RFC9396]</dt>
+      <dd>
+<span class="refAuthor">Lodderstedt, T.</span>, <span class="refAuthor">Richer, J.</span>, and <span class="refAuthor">B. Campbell</span>, <span class="refTitle">"OAuth 2.0 Rich Authorization Requests"</span>, <span class="seriesInfo">RFC 9396</span>, <span class="seriesInfo">DOI 10.17487/RFC9396</span>, <time datetime="2023-05" class="refDate">May 2023</time>, <span>&lt;<a href="https://www.rfc-editor.org/info/rfc9396">https://www.rfc-editor.org/info/rfc9396</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="RFC9449">[RFC9449]</dt>
+    <dd>
+<span class="refAuthor">Fett, D.</span>, <span class="refAuthor">Campbell, B.</span>, <span class="refAuthor">Bradley, J.</span>, <span class="refAuthor">Lodderstedt, T.</span>, <span class="refAuthor">Jones, M.</span>, and <span class="refAuthor">D. Waite</span>, <span class="refTitle">"OAuth 2.0 Demonstrating Proof of Possession (DPoP)"</span>, <span class="seriesInfo">RFC 9449</span>, <span class="seriesInfo">DOI 10.17487/RFC9449</span>, <time datetime="2023-09" class="refDate">September 2023</time>, <span>&lt;<a href="https://www.rfc-editor.org/info/rfc9449">https://www.rfc-editor.org/info/rfc9449</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+</dl>
+</section>
+</div>
+<div id="refs-informative">
+<section id="section-11">
+      <h2 id="name-informative-references">
+<a href="#section-11" class="section-number selfRef">11. </a><a href="#name-informative-references" class="section-name selfRef">Informative References</a>
+      </h2>
+<dl class="references">
+<dt id="I-D.araut-oauth-transaction-tokens-for-agents">[I-D.araut-oauth-transaction-tokens-for-agents]</dt>
+      <dd>
+<span class="refAuthor">Raut, A.</span>, <span class="refTitle">"Transaction Tokens For Agents"</span>, <span class="refContent">Work in Progress</span>, <span class="seriesInfo">Internet-Draft, draft-araut-oauth-transaction-tokens-for-agents-02</span>, <time datetime="2026-05-21" class="refDate">21 May 2026</time>, <span>&lt;<a href="https://datatracker.ietf.org/doc/html/draft-araut-oauth-transaction-tokens-for-agents-02">https://datatracker.ietf.org/doc/html/draft-araut-oauth-transaction-tokens-for-agents-02</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="I-D.goswami-agentic-jwt">[I-D.goswami-agentic-jwt]</dt>
+      <dd>
+<span class="refAuthor">Goswami, A.</span>, <span class="refTitle">"Secure Intent Protocol: JWT Compatible Agentic Identity and Workflow Management"</span>, <span class="refContent">Work in Progress</span>, <span class="seriesInfo">Internet-Draft, draft-goswami-agentic-jwt-00</span>, <time datetime="2026-01-01" class="refDate">1 January 2026</time>, <span>&lt;<a href="https://datatracker.ietf.org/doc/html/draft-goswami-agentic-jwt-00">https://datatracker.ietf.org/doc/html/draft-goswami-agentic-jwt-00</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="I-D.ietf-oauth-transaction-tokens">[I-D.ietf-oauth-transaction-tokens]</dt>
+      <dd>
+<span class="refAuthor">Tulshibagwale, A.</span>, <span class="refAuthor">Fletcher, G.</span>, and <span class="refAuthor">P. Kasselman</span>, <span class="refTitle">"Transaction Tokens"</span>, <span class="refContent">Work in Progress</span>, <span class="seriesInfo">Internet-Draft, draft-ietf-oauth-transaction-tokens-08</span>, <time datetime="2026-03-02" class="refDate">2 March 2026</time>, <span>&lt;<a href="https://datatracker.ietf.org/doc/html/draft-ietf-oauth-transaction-tokens-08">https://datatracker.ietf.org/doc/html/draft-ietf-oauth-transaction-tokens-08</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="I-D.ietf-wimse-arch">[I-D.ietf-wimse-arch]</dt>
+      <dd>
+<span class="refAuthor">Salowey, J. A.</span>, <span class="refAuthor">Rosomakho, Y.</span>, and <span class="refAuthor">H. Tschofenig</span>, <span class="refTitle">"Workload Identity in a Multi System Environment (WIMSE) Architecture"</span>, <span class="refContent">Work in Progress</span>, <span class="seriesInfo">Internet-Draft, draft-ietf-wimse-arch-07</span>, <time datetime="2026-03-02" class="refDate">2 March 2026</time>, <span>&lt;<a href="https://datatracker.ietf.org/doc/html/draft-ietf-wimse-arch-07">https://datatracker.ietf.org/doc/html/draft-ietf-wimse-arch-07</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="I-D.ietf-wimse-http-signature">[I-D.ietf-wimse-http-signature]</dt>
+      <dd>
+<span class="refAuthor">Salowey, J. A.</span> and <span class="refAuthor">Y. Sheffer</span>, <span class="refTitle">"WIMSE Workload-to-Workload Authentication with HTTP Signatures"</span>, <span class="refContent">Work in Progress</span>, <span class="seriesInfo">Internet-Draft, draft-ietf-wimse-http-signature-03</span>, <time datetime="2026-04-07" class="refDate">7 April 2026</time>, <span>&lt;<a href="https://datatracker.ietf.org/doc/html/draft-ietf-wimse-http-signature-03">https://datatracker.ietf.org/doc/html/draft-ietf-wimse-http-signature-03</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="I-D.ietf-wimse-identifier">[I-D.ietf-wimse-identifier]</dt>
+      <dd>
+<span class="refAuthor">Rosomakho, Y.</span> and <span class="refAuthor">J. A. Salowey</span>, <span class="refTitle">"Workload Identifier"</span>, <span class="refContent">Work in Progress</span>, <span class="seriesInfo">Internet-Draft, draft-ietf-wimse-identifier-02</span>, <time datetime="2026-03-02" class="refDate">2 March 2026</time>, <span>&lt;<a href="https://datatracker.ietf.org/doc/html/draft-ietf-wimse-identifier-02">https://datatracker.ietf.org/doc/html/draft-ietf-wimse-identifier-02</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="I-D.ietf-wimse-workload-creds">[I-D.ietf-wimse-workload-creds]</dt>
+      <dd>
+<span class="refAuthor">Campbell, B.</span>, <span class="refAuthor">Salowey, J. A.</span>, <span class="refAuthor">Schwenkschuster, A.</span>, <span class="refAuthor">Sheffer, Y.</span>, and <span class="refAuthor">Y. Rosomakho</span>, <span class="refTitle">"WIMSE Workload Credentials"</span>, <span class="refContent">Work in Progress</span>, <span class="seriesInfo">Internet-Draft, draft-ietf-wimse-workload-creds-01</span>, <time datetime="2026-05-05" class="refDate">5 May 2026</time>, <span>&lt;<a href="https://datatracker.ietf.org/doc/html/draft-ietf-wimse-workload-creds-01">https://datatracker.ietf.org/doc/html/draft-ietf-wimse-workload-creds-01</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="I-D.jiang-intent-security">[I-D.jiang-intent-security]</dt>
+      <dd>
+<span class="refAuthor">Jiang, Y.</span>, <span class="refAuthor">Lun, L.</span>, <span class="refAuthor">Song, Y.</span>, and <span class="refAuthor">F. Liu</span>, <span class="refTitle">"Security Considerations and Requirements for Intent-Based Requests in Agentic Systems"</span>, <span class="refContent">Work in Progress</span>, <span class="seriesInfo">Internet-Draft, draft-jiang-intent-security-03</span>, <time datetime="2026-06-22" class="refDate">22 June 2026</time>, <span>&lt;<a href="https://datatracker.ietf.org/doc/html/draft-jiang-intent-security-03">https://datatracker.ietf.org/doc/html/draft-jiang-intent-security-03</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="I-D.liu-oauth-a2a-profile">[I-D.liu-oauth-a2a-profile]</dt>
+      <dd>
+<span class="refAuthor">Liu, P. C.</span> and <span class="refAuthor">N. Yuan</span>, <span class="refTitle">"Agent-to-Agent (A2A) Profile for OAuth Transaction Tokens"</span>, <span class="refContent">Work in Progress</span>, <span class="seriesInfo">Internet-Draft, draft-liu-oauth-a2a-profile-00</span>, <time datetime="2025-10-20" class="refDate">20 October 2025</time>, <span>&lt;<a href="https://datatracker.ietf.org/doc/html/draft-liu-oauth-a2a-profile-00">https://datatracker.ietf.org/doc/html/draft-liu-oauth-a2a-profile-00</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="I-D.ni-a2a-ai-agent-security-requirements">[I-D.ni-a2a-ai-agent-security-requirements]</dt>
+      <dd>
+<span class="refAuthor">Yuan, N.</span>, <span class="refAuthor">Liu, P. C.</span>, <span class="refAuthor">Gao, Q.</span>, and <span class="refAuthor">Z. Li</span>, <span class="refTitle">"Security Requirements for AI Agents"</span>, <span class="refContent">Work in Progress</span>, <span class="seriesInfo">Internet-Draft, draft-ni-a2a-ai-agent-security-requirements-01</span>, <time datetime="2026-02-28" class="refDate">28 February 2026</time>, <span>&lt;<a href="https://datatracker.ietf.org/doc/html/draft-ni-a2a-ai-agent-security-requirements-01">https://datatracker.ietf.org/doc/html/draft-ni-a2a-ai-agent-security-requirements-01</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="RFC6749">[RFC6749]</dt>
+    <dd>
+<span class="refAuthor">Hardt, D., Ed.</span>, <span class="refTitle">"The OAuth 2.0 Authorization Framework"</span>, <span class="seriesInfo">RFC 6749</span>, <span class="seriesInfo">DOI 10.17487/RFC6749</span>, <time datetime="2012-10" class="refDate">October 2012</time>, <span>&lt;<a href="https://www.rfc-editor.org/info/rfc6749">https://www.rfc-editor.org/info/rfc6749</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+</dl>
+</section>
+</div>
+<div id="app-examples">
+<section id="appendix-A">
+      <h2 id="name-examples">
+<a href="#appendix-A" class="section-number selfRef">Appendix A. </a><a href="#name-examples" class="section-name selfRef">Examples</a>
+      </h2>
+<p id="appendix-A-1">
+      This appendix is informative. Whitespace is added for readability; long values are abbreviated with
+      an ellipsis.<a href="#appendix-A-1" class="pilcrow">¶</a></p>
+<span id="name-an-intent_admission-authori"></span><div id="ex-rar">
+<figure id="figure-2">
+        <div class="lang-json sourcecode" id="appendix-A-2.1">
+<pre>
+{
+  "type": "intent_admission",
+  "intent_ref": {
+    "hash_alg": "sha-256",
+    "digest": "0Fb9q2...e2c4",
+    "canonicalization": "jcs"
+  },
+  "originator": {
+    "id": "spiffe://example.org/agent/scheduler",
+    "class": "agent",
+    "execution_context": "foreground",
+    "attestation": "https://as.example.org/att/abc123"
+  },
+  "presenter": {
+    "id": "spiffe://example.org/gateway/order-gw",
+    "mode": "delegated",
+    "cnf_ref": "jkt"
+  },
+  "actions": ["purchase"],
+  "locations": ["https://api.example.com/orders"],
+  "datatypes": ["order"],
+  "decision": "admit",
+  "consent_required": true,
+  "consent": {
+    "method": "user_confirmation",
+    "time": "2026-06-23T08:59:00Z",
+    "scope_ref": "b3JkZXJz...",
+    "evidence_ref": "urn:example:consent:abc123"
+  },
+  "constraints": { "max_amount": "100.00", "currency": "USD" }
+}
+</pre>
+</div>
+<figcaption><a href="#figure-2" class="selfRef">Figure 2</a>:
+<a href="#name-an-intent_admission-authori" class="selfRef">An "intent_admission" authorization detail</a>
+        </figcaption></figure>
+</div>
+<p id="appendix-A-3">
+      The IAA is a JWS-signed JWT. Its decoded payload carries the registered claims and the authorization
+      detail above:<a href="#appendix-A-3" class="pilcrow">¶</a></p>
+<span id="name-decoded-payload-of-an-inten"></span><div id="ex-iaa">
+<figure id="figure-3">
+        <div class="lang-json sourcecode" id="appendix-A-4.1">
+<pre>
+{
+  "iss": "https://ap.example.org",
+  "aud": "https://api.example.com",
+  "iat": 1782205200,
+  "exp": 1782205320,
+  "jti": "9b8c7d6e-5f4a-3b2c-1d0e-0a1b2c3d4e5f",
+  "cnf": { "jkt": "0ZcOCMrU9eL3...K2bSt8Uw" },
+  "authorization_details": [
+    {
+      "type": "intent_admission",
+      "intent_ref": {
+        "hash_alg": "sha-256",
+        "digest": "0Fb9q2...e2c4",
+        "canonicalization": "jcs"
+      },
+      "originator": {
+        "id": "spiffe://example.org/agent/scheduler",
+        "class": "agent",
+        "execution_context": "foreground"
+      },
+      "presenter": {
+        "id": "spiffe://example.org/gateway/order-gw",
+        "mode": "delegated",
+        "cnf_ref": "jkt"
+      },
+      "actions": ["purchase"],
+      "decision": "admit",
+      "consent_required": true,
+      "consent": {
+        "method": "user_confirmation",
+        "time": "2026-06-23T08:59:00Z",
+        "scope_ref": "b3JkZXJz..."
+      }
+    }
+  ]
+}
+</pre>
+</div>
+<figcaption><a href="#figure-3" class="selfRef">Figure 3</a>:
+<a href="#name-decoded-payload-of-an-inten" class="selfRef">Decoded payload of an Intent Admission Assertion</a>
+        </figcaption></figure>
+</div>
+<p id="appendix-A-5">
+      The JWS header (not shown) carries the signing algorithm and a reference to the Admission Point's key;
+      the compact serialization concatenates the header, payload, and signature.<a href="#appendix-A-5" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="app-relationship">
+<section id="appendix-B">
+      <h2 id="name-relationship-to-the-intent-">
+<a href="#appendix-B" class="section-number selfRef">Appendix B. </a><a href="#name-relationship-to-the-intent-" class="section-name selfRef">Relationship to the Intent Security Requirements</a>
+      </h2>
+<p id="appendix-B-1">
+      This appendix is informative. It maps the behavior defined in this document onto the security
+      requirements of <span>[<a href="#I-D.jiang-intent-security" class="cite xref">I-D.jiang-intent-security</a>]</span>, for readers familiar with that document.<a href="#appendix-B-1" class="pilcrow">¶</a></p>
+<span id="name-mapping-to-requirements"></span><div id="tab-req-map">
+<table class="center" id="table-1">
+        <caption>
+<a href="#table-1" class="selfRef">Table 1</a>:
+<a href="#name-mapping-to-requirements" class="selfRef">Mapping to <span class="cite xref">[I-D.jiang-intent-security]</span> requirements</a>
+        </caption>
+<thead>
+          <tr>
+            <th class="text-left" rowspan="1" colspan="1">Behavior in this document</th>
+            <th class="text-left" rowspan="1" colspan="1">Requirement</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="text-left" rowspan="1" colspan="1">Authenticating the origin (<a href="#issue-authn" class="auto internal xref">Section 4.1</a>)</td>
+            <td class="text-left" rowspan="1" colspan="1">R8 (Origin Authentication)</td>
+          </tr>
+          <tr>
+            <td class="text-left" rowspan="1" colspan="1">Authorizing the request and obtaining consent (<a href="#issue-authz" class="auto internal xref">Section 4.2</a>, <a href="#issue-consent" class="auto internal xref">Section 4.3</a>)</td>
+            <td class="text-left" rowspan="1" colspan="1">R9 (Originator Authorization and Consent-Gated Admission)</td>
+          </tr>
+          <tr>
+            <td class="text-left" rowspan="1" colspan="1">Verifying the IAA as a non-bypassable gate (<a href="#verify" class="auto internal xref">Section 5</a>)</td>
+            <td class="text-left" rowspan="1" colspan="1">R5 (Non-Bypass Enforcement)</td>
+          </tr>
+          <tr>
+            <td class="text-left" rowspan="1" colspan="1">Logging and policy update (<a href="#dep-logging" class="auto internal xref">Section 6.2</a>)</td>
+            <td class="text-left" rowspan="1" colspan="1">R6, R7 (Observability; Policy-Driven Response)</td>
+          </tr>
+        </tbody>
+      </table>
+</div>
+</section>
+</div>
+<div id="acknowledgments">
+<section id="appendix-C">
+      <h2 id="name-acknowledgments">
+<a href="#name-acknowledgments" class="section-name selfRef">Acknowledgments</a>
+      </h2>
+<p id="appendix-C-1">TODO<a href="#appendix-C-1" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="authors-addresses">
+<section id="appendix-D">
+      <h2 id="name-authors-addresses">
+<a href="#name-authors-addresses" class="section-name selfRef">Authors' Addresses</a>
+      </h2>
+<address class="vcard">
+        <div dir="auto" class="left"><span class="fn nameRole">Yuning Jiang</span></div>
+<div dir="auto" class="left"><span class="org">Huawei</span></div>
+<div class="email">
+<span>Email:</span>
+<a href="mailto:jiangyuning2@h-partners.com" class="email">jiangyuning2@h-partners.com</a>
+</div>
+</address>
+<address class="vcard">
+        <div dir="auto" class="left"><span class="fn nameRole">Lun Li</span></div>
+<div dir="auto" class="left"><span class="org">Huawei</span></div>
+<div class="email">
+<span>Email:</span>
+<a href="mailto:lilun20@huawei.com" class="email">lilun20@huawei.com</a>
+</div>
+</address>
+<address class="vcard">
+        <div dir="auto" class="left"><span class="fn nameRole">Yurong Song</span></div>
+<div dir="auto" class="left"><span class="org">Huawei</span></div>
+<div class="email">
+<span>Email:</span>
+<a href="mailto:songyurong1@huawei.com" class="email">songyurong1@huawei.com</a>
+</div>
+</address>
+<address class="vcard">
+        <div dir="auto" class="left"><span class="fn nameRole">Faye Liu</span></div>
+<div dir="auto" class="left"><span class="org">Huawei</span></div>
+<div class="email">
+<span>Email:</span>
+<a href="mailto:liufei19@huawei.com" class="email">liufei19@huawei.com</a>
+</div>
+</address>
+</section>
+</div>
+<script>const toc = document.getElementById("toc");
+toc.querySelector("h2").addEventListener("click", e => {
+  toc.classList.toggle("active");
+});
+toc.querySelector("nav").addEventListener("click", e => {
+  toc.classList.remove("active");
+});
+</script>
+</body>
+</html>
