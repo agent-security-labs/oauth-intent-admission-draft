@@ -1,4 +1,4 @@
-<!-- regenerate: on (set to off if you edit this file) -->
+<!-- regenerate: off (this README documents the demo/ directory) -->
 
 # Intent Admission Assertions for Agentic Systems
 
@@ -9,6 +9,18 @@ This is the working area for the individual Internet-Draft, "Intent Admission As
 * [Individual Draft](https://datatracker.ietf.org/doc/html/draft-jiang-oauth-intent-admission)
 * [Compare Editor's Copy to Individual Draft](https://agent-security-labs.github.io/oauth-intent-admission-draft/#go.draft-jiang-oauth-intent-admission.diff)
 
+
+## Demo
+
+The [`demo/`](demo/) directory holds a proof-of-concept demonstration of the
+intent admission flow described in this draft:
+
+* `intent-admission-demo.pptx` — slides that walk through the demo.
+* `intent-admission-demo-linux` / `intent-admission-demo-macos` /
+  `intent-admission-demo-windows.exe` — standalone demo executables for
+  Linux, macOS, and Windows.
+
+These are illustrative artifacts and are not part of the Internet-Draft itself.
 
 ## Contributing
 
