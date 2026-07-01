@@ -13,12 +13,12 @@ This is the working area for the individual Internet-Draft, "Intent Admission As
 ## Demo
 
 The [`demo/`](demo/) directory holds a proof-of-concept demonstration of the
-intent admission flow described in this draft:
+intent admission flow described in this draft — standalone demo executables for
+Linux, macOS, and Windows:
 
-* `intent-admission-demo.pptx` — slides that walk through the demo.
-* `intent-admission-demo-linux` / `intent-admission-demo-macos` /
-  `intent-admission-demo-windows.exe` — standalone demo executables for
-  Linux, macOS, and Windows.
+* `intent-admission-demo-linux`
+* `intent-admission-demo-macos`
+* `intent-admission-demo-windows.exe`
 
 These are illustrative artifacts and are not part of the Internet-Draft itself.
 
