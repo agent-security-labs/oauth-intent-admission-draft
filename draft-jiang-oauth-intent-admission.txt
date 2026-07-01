@@ -5,9 +5,9 @@
 Web Authorization Protocol                                      Y. Jiang
 Internet-Draft                                                     L. Li
 Intended status: Standards Track                                 Y. Song
-Expires: 1 January 2027                                           F. Liu
+Expires: 2 January 2027                                           F. Liu
                                                                   Huawei
-                                                            30 June 2026
+                                                             1 July 2026
 
 
             Intent Admission Assertions for Agentic Systems
@@ -46,7 +46,7 @@ Status of This Memo
    time.  It is inappropriate to use Internet-Drafts as reference
    material or to cite them other than as "work in progress."
 
-   This Internet-Draft will expire on 1 January 2027.
+   This Internet-Draft will expire on 2 January 2027.
 
 Copyright Notice
 
